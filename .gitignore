@@ -1,0 +1,26 @@
+# Expo / React Native
+node_modules/
+.expo/
+dist/
+build/
+ios/
+android/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
