@@ -46,3 +46,20 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Environment Variables & Secrets (International Security Standard - Never commit real keys)
+.env
+.env.*
+!.env.example
+
+# Database Dumps, Local Backups & Supabase Temp Files
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.bak
+*.sql.bak
+supabase/.temp/
+supabase/.branches/
+docker-data/
+**/volumes/
