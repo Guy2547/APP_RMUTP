@@ -84,8 +84,8 @@ class AttendanceScreen extends StatelessWidget {
                           );
                         }
                       },
-                      backgroundColor: kGold,
-                      foregroundColor: kDark,
+                      backgroundColor: kDark,
+                      foregroundColor: Colors.white,
                     ),
                   ],
                 ),

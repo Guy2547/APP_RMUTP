@@ -323,7 +323,7 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              'RMUTP Campus App v1.0 • มหาวิทยาลัยเทคโนโลยีราชมงคลพระนคร',
+              'RMUTP Campus App v0.1 • UI Prototype เพื่อการศึกษา • สีตาม rmutp.ac.th',
               style: AppText.kanit(fontSize: 10, color: Colors.grey.shade400),
               textAlign: TextAlign.center,
             ),

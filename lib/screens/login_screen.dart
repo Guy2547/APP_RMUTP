@@ -145,16 +145,20 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             children: [
               const SizedBox(height: 16),
-              Container(
-                height: 68,
-                width: 68,
-                decoration: BoxDecoration(
-                  color: kDark,
-                  borderRadius: BorderRadius.circular(18),
+              Image.network(
+                'https://www.rmutp.ac.th/web2561/wp-content/uploads/2018/06/rmutp-logo.png',
+                height: 64,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 64,
+                  width: 64,
+                  decoration: BoxDecoration(
+                    color: kDark,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.school, color: Colors.white, size: 32),
                 ),
-                child: const Icon(Icons.school, color: kGold, size: 36),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Text(
                 'ยินดีต้อนรับสู่ RMUTP',
                 style: AppText.kanit(
