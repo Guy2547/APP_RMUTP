@@ -509,7 +509,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_cid VARCHAR;
+    v_cid TEXT;
 BEGIN
     SELECT citizen_id INTO v_cid FROM public.students WHERE student_id = p_student_id;
     RETURN public.fn_mask_citizen_id(v_cid);
@@ -572,7 +572,7 @@ SET search_path = public
 AS $$
 DECLARE
     v_uid UUID;
-    v_role VARCHAR;
+    v_role TEXT;
 BEGIN
     v_uid := public.fn_current_actor_id();
     IF v_uid IS NULL THEN
@@ -592,7 +592,7 @@ SET search_path = public
 AS $$
 DECLARE
     v_uid UUID;
-    v_sid VARCHAR;
+    v_sid TEXT;
 BEGIN
     v_uid := public.fn_current_actor_id();
     IF v_uid IS NULL THEN
@@ -612,7 +612,7 @@ SET search_path = public
 AS $$
 DECLARE
     v_uid UUID;
-    v_tid VARCHAR;
+    v_tid TEXT;
 BEGIN
     v_uid := public.fn_current_actor_id();
     IF v_uid IS NULL THEN
@@ -696,9 +696,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_actor_id VARCHAR;
-    v_actor_role VARCHAR;
-    v_record_id VARCHAR;
+    v_actor_id TEXT;
+    v_actor_role TEXT;
+    v_record_id TEXT;
 BEGIN
     v_actor_id := COALESCE(public.fn_current_teacher_id(), public.fn_current_student_id(), public.fn_current_actor_id()::TEXT, 'SYSTEM');
     v_actor_role := COALESCE(public.fn_current_actor_role(), 'system');
@@ -872,10 +872,10 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_actor_sid VARCHAR;
-    v_target_sid VARCHAR;
+    v_actor_sid VARCHAR(15);
+    v_target_sid VARCHAR(15);
     v_session RECORD;
-    v_existing_status VARCHAR;
+    v_existing_status TEXT;
     v_now_bkk TIMESTAMP;
     v_time_str VARCHAR(10);
     v_new_status VARCHAR(15);
@@ -979,8 +979,8 @@ SECURITY DEFINER
 SET search_path = public, extensions
 AS $$
 DECLARE
-    v_actor_sid VARCHAR;
-    v_target_sid VARCHAR;
+    v_actor_sid VARCHAR(15);
+    v_target_sid VARCHAR(15);
     v_due_date TIMESTAMPTZ;
     v_ext VARCHAR(20);
     v_safe_name VARCHAR(200);
@@ -1076,10 +1076,10 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_actor_role VARCHAR;
-    v_actor_tid VARCHAR;
+    v_actor_role TEXT;
+    v_actor_tid TEXT;
     v_item JSONB;
-    v_sid VARCHAR;
+    v_sid TEXT;
     v_mid INT;
     v_fin INT;
     v_cw INT;

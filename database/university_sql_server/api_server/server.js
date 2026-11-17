@@ -12,7 +12,7 @@
  * =============================================================================
  */
 
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -73,7 +73,7 @@ app.use(generalLimiter);
 // -----------------------------------------------------------------------------
 const pool = new Pool({
   host: process.env.PGHOST || 'localhost',
-  port: parseInt(process.env.PGPORT || '54325', 10),
+  port: Number.parseInt(process.env.PGPORT || '54325', 10),
   database: process.env.PGDATABASE || 'rmutp_university_db',
   user: process.env.PGUSER || 'postgres',
   password: process.env.PGPASSWORD || 'postgres',
@@ -88,35 +88,38 @@ const JWT_SECRET =
 // -----------------------------------------------------------------------------
 // 4. JWT Signing, Verification, RBAC & Anti-IDOR Middlewares (CWE-285 / CWE-639)
 // -----------------------------------------------------------------------------
-function base64UrlEncode(input) {
+function toBase64Url(input) {
   return Buffer.from(input)
     .toString('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
+    .replaceAll('=', '')
+    .replaceAll('+', '-')
+    .replaceAll('/', '_');
 }
 
 function base64UrlDecode(str) {
-  let pad = str.replace(/-/g, '+').replace(/_/g, '/');
-  while (pad.length % 4) pad += '=';
-  return Buffer.from(pad, 'base64').toString('utf8');
+  const normalized = str.replaceAll('-', '+').replaceAll('_', '/');
+  const padLength = (4 - (normalized.length % 4)) % 4;
+  return Buffer.from(normalized + '='.repeat(padLength), 'base64').toString('utf8');
+}
+
+function computeJwtSignature(header, body) {
+  const digest = crypto
+    .createHmac('sha256', JWT_SECRET)
+    .update(`${header}.${body}`)
+    .digest();
+  return toBase64Url(digest);
 }
 
 function signJwt(payload, expiresInSeconds = 12 * 3600) {
-  const header = base64UrlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const header = toBase64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const nowSeconds = Math.floor(Date.now() / 1000);
   const fullPayload = {
     ...payload,
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + expiresInSeconds,
+    iat: nowSeconds,
+    exp: nowSeconds + expiresInSeconds,
   };
-  const body = base64UrlEncode(JSON.stringify(fullPayload));
-  const signature = crypto
-    .createHmac('sha256', JWT_SECRET)
-    .update(`${header}.${body}`)
-    .digest('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
+  const body = toBase64Url(JSON.stringify(fullPayload));
+  const signature = computeJwtSignature(header, body);
   return `${header}.${body}.${signature}`;
 }
 
@@ -124,13 +127,7 @@ function verifyJwt(token) {
   const parts = String(token || '').split('.');
   if (parts.length !== 3) return null;
   const [header, body, sig] = parts;
-  const expectedSig = crypto
-    .createHmac('sha256', JWT_SECRET)
-    .update(`${header}.${body}`)
-    .digest('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
+  const expectedSig = computeJwtSignature(header, body);
 
   const sigBuf = Buffer.from(sig);
   const expectedBuf = Buffer.from(expectedSig);
@@ -180,7 +177,7 @@ async function withTransaction(user, workFn) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    if (user && user.sub) {
+    if (user?.sub) {
       await client.query("SELECT set_config('app.current_user_id', $1, true)", [
         String(user.sub),
       ]);
@@ -199,9 +196,10 @@ async function withTransaction(user, workFn) {
 // -----------------------------------------------------------------------------
 // 5. Resource & Column Whitelist (ห้ามเปิดเผย users / citizen_id ดิบ)
 // -----------------------------------------------------------------------------
-const RESOURCE_CONFIG = {
+const RESOURCE_CONFIG = Object.freeze({
   // Views (อ่านอย่างเดียว)
   v_student_profiles: {
+    table: 'public.v_student_profiles',
     columns: [
       'student_id', 'university_email', 'prefix_th', 'first_name_th', 'last_name_th',
       'full_name_th', 'full_name_en', 'citizen_id', 'birth_date', 'blood_group',
@@ -217,6 +215,7 @@ const RESOURCE_CONFIG = {
     readRoles: ['student', 'teacher', 'admin'],
   },
   v_student_timetable: {
+    table: 'public.v_student_timetable',
     columns: [
       'student_id', 'term_label', 'code', 'name', 'credits', 'section', 'day_of_week',
       'time', 'room', 'teacher', 'status', 'course_summary', 'progress',
@@ -226,6 +225,7 @@ const RESOURCE_CONFIG = {
     readRoles: ['student', 'teacher', 'admin'],
   },
   v_teacher_timetable: {
+    table: 'public.v_teacher_timetable',
     columns: [
       'teacher_id', 'term_label', 'code', 'timetable_name', 'course_name', 'section',
       'day_of_week', 'time', 'room', 'student_count_label', 'enrolled_count',
@@ -234,6 +234,7 @@ const RESOURCE_CONFIG = {
     readRoles: ['teacher', 'admin'],
   },
   v_teacher_grade_sheet: {
+    table: 'public.v_teacher_grade_sheet',
     columns: [
       'enrollment_id', 'section_id', 'subject_code', 'subject_name', 'section_number',
       'id', 'name', 'full_name', 'midterm', 'final_exam', 'coursework', 'total',
@@ -242,6 +243,7 @@ const RESOURCE_CONFIG = {
     readRoles: ['teacher', 'admin'],
   },
   v_student_grades: {
+    table: 'public.v_student_grades',
     columns: [
       'student_id', 'term_label', 'is_current', 'subject_code', 'subject_name',
       'credits', 'letter', 'score', 'total_score', 'is_warning', 'grade_submit_status',
@@ -250,6 +252,7 @@ const RESOURCE_CONFIG = {
     readRoles: ['student', 'teacher', 'admin'],
   },
   v_student_financial_records: {
+    table: 'public.v_student_financial_records',
     columns: [
       'invoice_no', 'student_id', 'student_name', 'term_label', 'tuition_fee',
       'university_fee', 'lab_equipment_fee', 'scholarship_discount', 'total_amount',
@@ -262,26 +265,32 @@ const RESOURCE_CONFIG = {
   },
   // Public/Catalog Tables
   faculties: {
+    table: 'public.faculties',
     columns: ['id', 'code', 'name_th', 'name_en', 'campus', 'building', 'phone', 'website_url'],
     readRoles: ['student', 'teacher', 'admin'],
   },
   departments: {
+    table: 'public.departments',
     columns: ['id', 'faculty_id', 'code', 'name_th', 'name_en', 'degree_name_th', 'total_credits_required'],
     readRoles: ['student', 'teacher', 'admin'],
   },
   academic_calendar_events: {
+    table: 'public.academic_calendar_events',
     columns: ['id', 'term_id', 'title', 'date_display', 'event_type', 'start_date', 'end_date', 'description'],
     readRoles: ['student', 'teacher', 'admin'],
   },
   course_materials: {
+    table: 'public.course_materials',
     columns: ['id', 'section_id', 'subject_code', 'title', 'file_type', 'file_size_label', 'file_url', 'updated_label'],
     readRoles: ['student', 'teacher', 'admin'],
   },
   assignments: {
+    table: 'public.assignments',
     columns: ['id', 'section_id', 'subject_code', 'title', 'description', 'due_badge', 'due_date', 'max_score', 'submitted_count', 'total_students'],
     readRoles: ['student', 'teacher', 'admin'],
   },
   news_announcements: {
+    table: 'public.news_announcements',
     columns: ['id', 'title', 'subtitle', 'news_type', 'detail', 'banner_image_url', 'button_label', 'min_gpa_required', 'author_teacher_id', 'view_count', 'published_at', 'expire_date'],
     insertColumns: ['title', 'subtitle', 'news_type', 'detail', 'button_label', 'author_teacher_id'],
     readRoles: ['student', 'teacher', 'admin'],
@@ -289,6 +298,7 @@ const RESOURCE_CONFIG = {
   },
   // Role/Owner-Protected Tables
   enrollments: {
+    table: 'public.enrollments',
     columns: ['id', 'student_id', 'section_id', 'term_id', 'subject_code', 'enrollment_status', 'coursework_score', 'midterm_score', 'final_score', 'total_score', 'grade_letter', 'grade_submit_status'],
     updateColumns: ['coursework_score', 'midterm_score', 'final_score', 'grade_submit_status'],
     studentScoped: true,
@@ -296,17 +306,20 @@ const RESOURCE_CONFIG = {
     writeRoles: ['teacher', 'admin'],
   },
   attendance_sessions: {
+    table: 'public.attendance_sessions',
     columns: ['id', 'section_id', 'subject_code', 'session_date', 'week_number', 'room_code', 'open_time_label', 'opened_at', 'is_open', 'present_count', 'total_students'],
     updateColumns: ['is_open'],
     readRoles: ['student', 'teacher', 'admin'],
     writeRoles: ['teacher', 'admin'],
   },
   attendance_records: {
+    table: 'public.attendance_records',
     columns: ['id', 'session_id', 'student_id', 'status', 'check_in_time', 'check_in_method', 'reminded_via_line', 'note'],
     studentScoped: true,
     readRoles: ['student', 'teacher', 'admin'],
   },
   service_requests: {
+    table: 'public.service_requests',
     columns: ['request_code', 'student_id', 'category', 'title', 'description', 'room_location', 'status_student', 'status_teacher', 'chip_color_hex', 'progress', 'assigned_teacher_id', 'result_pdf_url', 'created_at'],
     insertColumns: ['request_code', 'student_id', 'category', 'title', 'description', 'status_student', 'status_teacher', 'chip_color_hex', 'progress', 'assigned_teacher_id'],
     updateColumns: ['status_student', 'status_teacher', 'chip_color_hex', 'progress'],
@@ -316,15 +329,23 @@ const RESOURCE_CONFIG = {
     writeRoles: ['teacher', 'admin'],
   },
   notifications: {
+    table: 'public.notifications',
     columns: ['id', 'student_id', 'title', 'subtitle', 'accent_color_hex', 'is_read', 'created_at'],
     studentScoped: true,
     readRoles: ['student', 'teacher', 'admin'],
   },
   audit_logs: {
+    table: 'public.audit_logs',
     columns: ['id', 'actor_id', 'actor_role', 'action', 'target_table', 'target_record_id', 'old_data', 'new_data', 'created_at'],
     readRoles: ['teacher', 'admin'],
   },
-};
+});
+
+function getResourceConfig(resourceName) {
+  return Object.hasOwn(RESOURCE_CONFIG, resourceName)
+    ? RESOURCE_CONFIG[resourceName]
+    : null;
+}
 
 // -----------------------------------------------------------------------------
 // 6. Health Check & Authentication Endpoints
@@ -418,10 +439,10 @@ app.post(
 
       res.json(rows);
     } catch (err) {
-      if (err.message && err.message.includes('closed')) {
+      if (err.message?.includes('closed')) {
         return res.status(400).json({ error: 'อาจารย์ปิดรับเช็กชื่อแล้ว' });
       }
-      if (err.message && err.message.includes('Duplicate')) {
+      if (err.message?.includes('Duplicate')) {
         return res.status(409).json({ error: 'คุณได้เช็กชื่อในคาบนี้ไปแล้ว' });
       }
       next(err);
@@ -448,7 +469,7 @@ app.post(
         req.body.p_assignment_id || '66666666-6666-6666-6666-666666666601'
       );
       const filename = String(req.body.p_original_filename || '').trim();
-      const fileSize = parseInt(req.body.p_file_size_bytes || '256000', 10);
+      const fileSize = Number.parseInt(req.body.p_file_size_bytes || '256000', 10);
       const mimeType = String(req.body.p_mime_type || 'application/pdf').trim();
 
       if (!ALLOWED_EXT.test(filename) || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
@@ -522,51 +543,78 @@ app.post(
 // -----------------------------------------------------------------------------
 // 8. Protected Parameterized Query Builder & Generic REST Adapter
 // -----------------------------------------------------------------------------
+function stripEqPrefix(rawVal) {
+  const strVal = String(rawVal);
+  return strVal.startsWith('eq.') ? strVal.slice(3) : strVal;
+}
+
+function parseOrderClause(rawOrder, allowedCols) {
+  if (!rawOrder) return '';
+  const [rawCol, rawDir] = String(rawOrder).split('.');
+  const safeCol = allowedCols.find((col) => col === rawCol);
+  if (!safeCol) return '';
+  const dir = rawDir?.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+  return ` ORDER BY ${safeCol} ${dir}`;
+}
+
 function buildSafeWhereClause(queryObj, allowedCols, forcedFilter = {}) {
-  const allowedSet = new Set(allowedCols);
   const clauses = [];
   const values = [];
-  let orderClause = '';
 
-  // บังคับใช้ค่าตัวกรองจาก JWT (Anti-IDOR)
-  for (const [fCol, fVal] of Object.entries(forcedFilter)) {
-    if (allowedSet.has(fCol)) {
-      values.push(fVal);
-      clauses.push(`${fCol} = $${values.length}`);
-    }
-  }
-
-  for (const [key, rawVal] of Object.entries(queryObj)) {
-    if (key === 'select') continue;
-    if (key === 'order') {
-      const [rawCol, rawDir] = String(rawVal).split('.');
-      if (allowedSet.has(rawCol)) {
-        const dir = rawDir && rawDir.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
-        orderClause = ` ORDER BY ${rawCol} ${dir}`;
-      }
+  // บังคับใช้ค่าตัวกรองจาก JWT (Anti-IDOR) และใช้ชื่อคอลัมน์จาก Whitelist เท่านั้น
+  for (const col of allowedCols) {
+    if (Object.hasOwn(forcedFilter, col)) {
+      values.push(forcedFilter[col]);
+      clauses.push(`${col} = $${values.length}`);
       continue;
     }
-
-    if (!allowedSet.has(key)) continue;
-    if (Object.prototype.hasOwnProperty.call(forcedFilter, key)) continue;
-
-    const strVal = String(rawVal);
-    const val = strVal.startsWith('eq.') ? strVal.slice(3) : strVal;
-    values.push(val);
-    clauses.push(`${key} = $${values.length}`);
+    if (Object.hasOwn(queryObj, col)) {
+      values.push(stripEqPrefix(queryObj[col]));
+      clauses.push(`${col} = $${values.length}`);
+    }
   }
 
   return {
     whereSql: clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '',
-    orderSql: orderClause,
+    orderSql: parseOrderClause(queryObj.order, allowedCols),
     values,
   };
 }
 
+function validateEnrollmentScores(body) {
+  for (const field of ['midterm_score', 'coursework_score', 'final_score']) {
+    if (body[field] === undefined) continue;
+    const val = Number(body[field]);
+    const max = field === 'final_score' ? 40 : 30;
+    if (Number.isNaN(val) || val < 0 || val > max) {
+      return `คะแนน ${field} ต้องอยู่ระหว่าง 0 ถึง ${max}`;
+    }
+  }
+  return null;
+}
+
+function buildPatchParts(body, queryObj, cfg) {
+  const setCols = [];
+  const values = [];
+  for (const col of cfg.updateColumns) {
+    if (!Object.hasOwn(body, col)) continue;
+    values.push(body[col]);
+    setCols.push(`${col} = $${values.length}`);
+  }
+
+  const whereParts = [];
+  for (const col of cfg.columns) {
+    if (!Object.hasOwn(queryObj, col)) continue;
+    values.push(stripEqPrefix(queryObj[col]));
+    whereParts.push(`${col} = $${values.length}`);
+  }
+
+  return { setCols, whereParts, values };
+}
+
 // GET Resource (ต้องยืนยัน JWT + เช็ก Role + เช็ก Anti-IDOR ทุกครั้ง)
 app.get(['/api/:resource', '/rest/v1/:resource'], requireAuth, async (req, res, next) => {
-  const { resource } = req.params;
-  const cfg = RESOURCE_CONFIG[resource];
+  const cfg = getResourceConfig(req.params.resource);
   if (!cfg) {
     return res.status(404).json({ error: 'ไม่พบทรัพยากรที่ร้องขอ' });
   }
@@ -577,7 +625,7 @@ app.get(['/api/:resource', '/rest/v1/:resource'], requireAuth, async (req, res, 
   // Anti-IDOR: ถ้านักศึกษาพยายามส่ง student_id คนอื่นใน Query ให้บล็อกทันที
   const forcedFilter = {};
   if (req.user.role === 'student' && cfg.studentScoped) {
-    const reqSid = req.query.student_id ? String(req.query.student_id).replace(/^eq\./, '') : null;
+    const reqSid = req.query.student_id ? stripEqPrefix(req.query.student_id) : null;
     if (reqSid && reqSid !== req.user.student_id) {
       return res.status(403).json({ error: 'ไม่อนุญาตให้เข้าถึงข้อมูลของนักศึกษาท่านอื่น (IDOR Blocked)' });
     }
@@ -591,7 +639,7 @@ app.get(['/api/:resource', '/rest/v1/:resource'], requireAuth, async (req, res, 
       cfg.columns,
       forcedFilter
     );
-    const sql = `SELECT ${selectCols} FROM public.${resource}${whereSql}${orderSql}`;
+    const sql = `SELECT ${selectCols} FROM ${cfg.table}${whereSql}${orderSql}`;
     const result = await pool.query(sql, values);
     res.json(result.rows);
   } catch (err) {
@@ -601,9 +649,8 @@ app.get(['/api/:resource', '/rest/v1/:resource'], requireAuth, async (req, res, 
 
 // POST Resource (ภายใต้ Transaction + Whitelist Columns + Anti-IDOR)
 app.post(['/api/:resource', '/rest/v1/:resource'], requireAuth, async (req, res, next) => {
-  const { resource } = req.params;
-  const cfg = RESOURCE_CONFIG[resource];
-  if (!cfg || !cfg.insertColumns) {
+  const cfg = getResourceConfig(req.params.resource);
+  if (!cfg?.insertColumns) {
     return res.status(403).json({ error: 'ไม่อนุญาตให้สร้างข้อมูลในตารางนี้โดยตรง' });
   }
 
@@ -613,19 +660,18 @@ app.post(['/api/:resource', '/rest/v1/:resource'], requireAuth, async (req, res,
   }
 
   try {
-    const body = { ...(req.body || {}) };
+    const body = { ...req.body };
     if (req.user.role === 'student' && cfg.studentScoped) {
       if (body.student_id && body.student_id !== req.user.student_id) {
         return res.status(403).json({ error: 'ไม่อนุญาตให้ส่งคำร้องแทนผู้อื่น' });
       }
       body.student_id = req.user.student_id;
     }
-    if (resource === 'news_announcements' && req.user.teacher_id) {
+    if (cfg.table === 'public.news_announcements' && req.user.teacher_id) {
       body.author_teacher_id = req.user.teacher_id;
     }
 
-    const allowedSet = new Set(cfg.insertColumns);
-    const keys = Object.keys(body).filter((k) => allowedSet.has(k));
+    const keys = cfg.insertColumns.filter((col) => Object.hasOwn(body, col));
     if (keys.length === 0) {
       return res.status(400).json({ error: 'ไม่มีฟิลด์ที่ได้รับอนุญาตให้บันทึก' });
     }
@@ -635,7 +681,7 @@ app.post(['/api/:resource', '/rest/v1/:resource'], requireAuth, async (req, res,
     const returnCols = cfg.columns.join(', ');
 
     const rows = await withTransaction(req.user, async (client) => {
-      const sql = `INSERT INTO public.${resource} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING ${returnCols}`;
+      const sql = `INSERT INTO ${cfg.table} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING ${returnCols}`;
       const result = await client.query(sql, values);
       return result.rows;
     });
@@ -648,9 +694,8 @@ app.post(['/api/:resource', '/rest/v1/:resource'], requireAuth, async (req, res,
 
 // PATCH Resource (เฉพาะ Role ที่ได้รับอนุญาต + Transaction + Input Validation)
 app.patch(['/api/:resource', '/rest/v1/:resource'], requireAuth, async (req, res, next) => {
-  const { resource } = req.params;
-  const cfg = RESOURCE_CONFIG[resource];
-  if (!cfg || !cfg.updateColumns) {
+  const cfg = getResourceConfig(req.params.resource);
+  if (!cfg?.updateColumns) {
     return res.status(403).json({ error: 'ไม่อนุญาตให้แก้ไขข้อมูลในตารางนี้โดยตรง' });
   }
 
@@ -660,49 +705,25 @@ app.patch(['/api/:resource', '/rest/v1/:resource'], requireAuth, async (req, res
   }
 
   try {
-    const body = req.body || {};
-    if (resource === 'enrollments') {
-      for (const field of ['midterm_score', 'coursework_score', 'final_score']) {
-        if (body[field] !== undefined) {
-          const val = Number(body[field]);
-          const max = field === 'final_score' ? 40 : 30;
-          if (Number.isNaN(val) || val < 0 || val > max) {
-            return res.status(400).json({ error: `คะแนน ${field} ต้องอยู่ระหว่าง 0 ถึง ${max}` });
-          }
-        }
+    const body = { ...req.body };
+    if (cfg.table === 'public.enrollments') {
+      const scoreError = validateEnrollmentScores(body);
+      if (scoreError) {
+        return res.status(400).json({ error: scoreError });
       }
     }
 
-    const allowedSet = new Set(cfg.updateColumns);
-    const keys = Object.keys(body).filter((k) => allowedSet.has(k));
-    if (keys.length === 0) {
+    const { setCols, whereParts, values } = buildPatchParts(body, req.query, cfg);
+    if (setCols.length === 0) {
       return res.status(400).json({ error: 'ไม่มีฟิลด์ที่ได้รับอนุญาตให้แก้ไข' });
     }
-
-    const setCols = [];
-    const values = [];
-    for (const k of keys) {
-      values.push(body[k]);
-      setCols.push(`${k} = $${values.length}`);
-    }
-
-    const whereCols = new Set(cfg.columns);
-    const whereParts = [];
-    for (const [k, rawVal] of Object.entries(req.query)) {
-      if (!whereCols.has(k)) continue;
-      const strVal = String(rawVal);
-      const val = strVal.startsWith('eq.') ? strVal.slice(3) : strVal;
-      values.push(val);
-      whereParts.push(`${k} = $${values.length}`);
-    }
-
     if (whereParts.length === 0) {
       return res.status(400).json({ error: 'ต้องระบุเงื่อนไขในการแก้ไขข้อมูลเพื่อความปลอดภัย' });
     }
 
     const returnCols = cfg.columns.join(', ');
     const rows = await withTransaction(req.user, async (client) => {
-      const sql = `UPDATE public.${resource} SET ${setCols.join(', ')} WHERE ${whereParts.join(' AND ')} RETURNING ${returnCols}`;
+      const sql = `UPDATE ${cfg.table} SET ${setCols.join(', ')} WHERE ${whereParts.join(' AND ')} RETURNING ${returnCols}`;
       const result = await client.query(sql, values);
       return result.rows;
     });
@@ -727,7 +748,7 @@ app.use((err, req, res, _next) => {
   });
 });
 
-const PORT = parseInt(process.env.PORT || '4000', 10);
+const PORT = Number.parseInt(process.env.PORT || '4000', 10);
 app.listen(PORT, () => {
   console.log(`RMUTP Hardened University Express API running on port ${PORT}`);
 });
