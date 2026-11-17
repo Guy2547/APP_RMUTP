@@ -15,16 +15,12 @@ import 'screens/notif_screen.dart';
 import 'screens/requests_screen.dart';
 import 'screens/help_screen.dart';
 import 'providers/role_provider.dart';
+import 'providers/app_database_provider.dart';
 import 'screens/profile_screen.dart';
 import 'widgets/app_theme.dart';
 
 void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => RoleProvider(),
-      child: const RMUTPApp(),
-    ),
-  );
+  runApp(const RMUTPApp());
 }
 
 class RMUTPApp extends StatelessWidget {
@@ -32,27 +28,33 @@ class RMUTPApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'RMUTP Campus App',
-      debugShowCheckedModeBanner: false,
-      theme: _themeData,
-      initialRoute: '/login',
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/home': (context) => const HomeScreen(),
-        '/timetable': (context) => const TimetableScreen(),
-        '/courses': (context) => const CoursesScreen(),
-        '/course-detail': (context) => const CourseDetailScreen(),
-        '/grades': (context) => const GradesScreen(),
-        '/grade-submit': (context) => const GradeSubmitScreen(),
-        '/attendance': (context) => const AttendanceScreen(),
-        '/news': (context) => const NewsScreen(),
-        '/news-detail': (context) => const NewsDetailScreen(),
-        '/notif': (context) => const NotifScreen(),
-        '/requests': (context) => const RequestsScreen(),
-        '/help': (context) => const HelpScreen(),
-        '/profile': (context) => const ProfileScreen(),
-      },
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => RoleProvider()),
+        ChangeNotifierProvider(create: (_) => AppDatabaseProvider()),
+      ],
+      child: MaterialApp(
+        title: 'RMUTP Campus App',
+        debugShowCheckedModeBanner: false,
+        theme: _themeData,
+        initialRoute: '/login',
+        routes: {
+          '/login': (context) => const LoginScreen(),
+          '/home': (context) => const HomeScreen(),
+          '/timetable': (context) => const TimetableScreen(),
+          '/courses': (context) => const CoursesScreen(),
+          '/course-detail': (context) => const CourseDetailScreen(),
+          '/grades': (context) => const GradesScreen(),
+          '/grade-submit': (context) => const GradeSubmitScreen(),
+          '/attendance': (context) => const AttendanceScreen(),
+          '/news': (context) => const NewsScreen(),
+          '/news-detail': (context) => const NewsDetailScreen(),
+          '/notif': (context) => const NotifScreen(),
+          '/requests': (context) => const RequestsScreen(),
+          '/help': (context) => const HelpScreen(),
+          '/profile': (context) => const ProfileScreen(),
+        },
+      ),
     );
   }
 
@@ -86,7 +88,7 @@ class RMUTPApp extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: kMid, width: 2),
+          borderSide: const BorderSide(color: kMid, width: 2),
         ),
         labelStyle: const TextStyle(color: kDark, fontWeight: FontWeight.w600, fontSize: 14),
       ),

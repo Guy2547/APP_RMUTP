@@ -1,0 +1,52 @@
+# =============================================================================
+# RMUTP University SQL Server & Node.js Express Middleware (System 2)
+# จำลองเครื่องเซิร์ฟเวอร์ฐานข้อมูลจริงของมหาวิทยาลัย (On-Premise SQL + Express API)
+# =============================================================================
+# วิธีรัน:
+#   docker-compose -f database/university_sql_server/docker-compose.university.yml up -d --build
+# =============================================================================
+
+name: rmutp-university-sql
+
+services:
+  university-db:
+    container_name: rmutp-university-postgres
+    image: postgres:15-alpine
+    restart: unless-stopped
+    ports:
+      - "54325:5432"
+    environment:
+      POSTGRES_DB: rmutp_university_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - rmutp_university_sql_data:/var/lib/postgresql/data
+      - ./01_standard_sql_setup.sql:/docker-entrypoint-initdb.d/01_standard_sql_setup.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rmutp_university_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  university-api:
+    container_name: rmutp-university-express-api
+    build:
+      context: ./api_server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      university-db:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      PGHOST: university-db
+      PGPORT: 5432
+      PGDATABASE: rmutp_university_db
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+volumes:
+  rmutp_university_sql_data:
+    name: rmutp_university_sql_data

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_bottom_nav.dart';
@@ -10,6 +11,9 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final db = context.watch<AppDatabaseProvider>();
+    final isTeacher = context.watch<RoleProvider>().isTeacher;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('RMUTP Campus'),
@@ -18,32 +22,32 @@ class HomeScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'ซิงก์ฐานข้อมูลล่าสุด',
+            onPressed: () => db.refreshAllData(),
+          ),
+          IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () => Navigator.pushNamed(context, '/notif'),
           ),
         ],
       ),
-      body: Consumer<RoleProvider>(
-        builder: (context, roleProvider, _) {
-          final isTeacher = roleProvider.isTeacher;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildWelcomeCard(isTeacher),
-                const SizedBox(height: 16),
-                _buildStatsCards(isTeacher),
-                const SizedBox(height: 16),
-                _buildCurrentClassCard(context, isTeacher),
-                const SizedBox(height: 16),
-                _buildShortcutMenu(context, isTeacher),
-                const SizedBox(height: 16),
-                _buildInfoCard(context, isTeacher),
-              ],
-            ),
-          );
-        },
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildWelcomeCard(db, isTeacher),
+            const SizedBox(height: 16),
+            _buildStatsCards(db, isTeacher),
+            const SizedBox(height: 16),
+            _buildCurrentClassCard(context, db, isTeacher),
+            const SizedBox(height: 16),
+            _buildShortcutMenu(context, isTeacher),
+            const SizedBox(height: 16),
+            _buildInfoCard(context, db, isTeacher),
+          ],
+        ),
       ),
       bottomNavigationBar: CustomBottomNav(
         currentRoute: '/home',
@@ -52,7 +56,8 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWelcomeCard(bool isTeacher) {
+  Widget _buildWelcomeCard(AppDatabaseProvider db, bool isTeacher) {
+    final user = db.currentUser;
     return AppCard(
       color: Colors.white,
       padding: const EdgeInsets.all(16),
@@ -60,20 +65,34 @@ class HomeScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isTeacher ? 'สวัสดี 👋 อ.สุรชัย (สอน 2 วิชา • ที่ปรึกษาปี 2)' : 'สวัสดี 👋 น.ส.มินตรา (วิศวกรรมคอมพิวเตอร์ ปี 2)',
-            style: AppText.kanit(fontSize: 13, color: Colors.grey.shade500),
+            'สวัสดี 👋 ${user.displayName} (${user.subtitleInfo})',
+            style: AppText.kanit(fontSize: 13, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 4),
           Text(
-            isTeacher ? 'วันนี้สอน 2 วิชา • รอตรวจ 12 ชิ้น' : 'วันนี้เรียน 3 วิชา • งานใกล้ส่ง 2 ชิ้น',
-            style: AppText.kanit(fontSize: 17, fontWeight: FontWeight.w600, color: kDark),
+            isTeacher
+                ? 'ภาคเรียน 1/2569 • สอน ${db.teacherTimetable.length} วิชา • นศ. ในห้อง 12 คน'
+                : 'ภาคเรียน 1/2569 • ลงทะเบียน ${db.studentTimetable.length} วิชา • หน่วยกิตสะสม ${user.earnedCredits}/${user.totalCreditsRequired}',
+            style: AppText.kanit(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: kDark,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatsCards(bool isTeacher) {
+  Widget _buildStatsCards(AppDatabaseProvider db, bool isTeacher) {
+    final user = db.currentUser;
+    final pendingHw = db.studentTimetable.fold<int>(
+      0,
+      (sum, item) => sum + item.pendingAssignments,
+    );
+    final presentRatio =
+        '${db.presentAttendanceCount}/${db.attendanceRecords.length}';
+
     return GridView.count(
       crossAxisCount: 3,
       shrinkWrap: true,
@@ -83,22 +102,26 @@ class HomeScreen extends StatelessWidget {
       childAspectRatio: 1.5,
       children: [
         _statItem(
-          isTeacher ? '2' : '3.42',
-          isTeacher ? 'วิชาที่สอน' : 'GPA รวม',
+          isTeacher
+              ? '${db.teacherTimetable.length}'
+              : user.gpax.toStringAsFixed(2),
+          isTeacher ? 'วิชาที่สอน' : 'GPA สะสม',
           kDark,
           Colors.white,
           kDark,
         ),
         _statItem(
-          isTeacher ? '28/40' : '92%',
-          isTeacher ? 'มาเรียน' : 'เข้าเรียน',
+          isTeacher ? presentRatio : '92%',
+          isTeacher ? 'มาเรียนวันนี้' : 'เข้าเรียน',
           kGold,
           kDark,
           Colors.transparent,
         ),
         _statItem(
-          isTeacher ? '12' : '2',
-          isTeacher ? 'รอตรวจ' : 'งานค้างส่ง',
+          isTeacher
+              ? '${db.teacherGradeRows.length - db.submittedGradeCount}'
+              : '$pendingHw',
+          isTeacher ? 'รอส่งเกรด' : 'งานค้างส่ง',
           Colors.white,
           kMid,
           Colors.white,
@@ -108,7 +131,14 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _statItem(String value, String label, Color bgColor, Color textColor, Color borderColor, {bool border = false}) {
+  Widget _statItem(
+    String value,
+    String label,
+    Color bgColor,
+    Color textColor,
+    Color borderColor, {
+    bool border = false,
+  }) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -138,10 +168,22 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCurrentClassCard(BuildContext context, bool isTeacher) {
+  Widget _buildCurrentClassCard(
+    BuildContext context,
+    AppDatabaseProvider db,
+    bool isTeacher,
+  ) {
+    final firstSub = isTeacher
+        ? (db.teacherTimetable.isNotEmpty ? db.teacherTimetable.first : null)
+        : (db.studentTimetable.isNotEmpty ? db.studentTimetable.first : null);
+
+    final subtitle = firstSub != null
+        ? '${firstSub.code} — ${firstSub.name} (${firstSub.section})\n${firstSub.time} • ${firstSub.room} • ${firstSub.teacher}'
+        : 'ENGCE302 — ระบบฐานข้อมูล (Sec.1)\n09:00–12:00 • ห้อง 1604 • อ.สุรชัย';
+
     return SubjectCard(
       title: isTeacher ? '👩‍🏫 กำลังสอนตอนนี้' : '⏰ กำลังเรียนตอนนี้',
-      subtitle: 'ENGCE302 — ระบบฐานข้อมูล (Sec.1)\n09:00–12:00 • ห้อง 1604 • ${isTeacher ? '' : 'อ.สุรชัย'}',
+      subtitle: subtitle,
       leftBorderColor: kMid,
       actions: [
         Expanded(
@@ -169,7 +211,11 @@ class HomeScreen extends StatelessWidget {
       children: [
         Text(
           'เมนูลัด',
-          style: AppText.kanit(fontSize: 15, fontWeight: FontWeight.w600, color: kDark),
+          style: AppText.kanit(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: kDark,
+          ),
         ),
         const SizedBox(height: 10),
         GridView.count(
@@ -179,7 +225,8 @@ class HomeScreen extends StatelessWidget {
           crossAxisSpacing: 8,
           mainAxisSpacing: 8,
           childAspectRatio: 0.85,
-          children: isTeacher ? _teacherShortcuts(context) : _studentShortcuts(context),
+          children:
+              isTeacher ? _teacherShortcuts(context) : _studentShortcuts(context),
         ),
       ],
     );
@@ -211,7 +258,12 @@ class HomeScreen extends StatelessWidget {
     ];
   }
 
-  Widget _shortcutBtn(BuildContext context, String emoji, String label, String route) {
+  Widget _shortcutBtn(
+    BuildContext context,
+    String emoji,
+    String label,
+    String route,
+  ) {
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, route),
       child: AppCard(
@@ -224,7 +276,11 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               label,
-              style: AppText.kanit(fontSize: 10, fontWeight: FontWeight.w600, color: kDark),
+              style: AppText.kanit(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: kDark,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -233,7 +289,11 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, bool isTeacher) {
+  Widget _buildInfoCard(
+    BuildContext context,
+    AppDatabaseProvider db,
+    bool isTeacher,
+  ) {
     return AppCard(
       border: Border.all(color: const Color(0xFFE9D27A)),
       color: Colors.white,
@@ -241,20 +301,29 @@ class HomeScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isTeacher ? '📝 งานรอตรวจ 12 ชิ้น' : '⭐ ทุนแนะนำสำหรับคุณ',
-            style: AppText.kanit(fontSize: 14, fontWeight: FontWeight.w600, color: kDark),
+            isTeacher
+                ? '📝 สถานะการส่งเกรด: ส่งแล้ว ${db.submittedGradeCount}/${db.teacherGradeRows.length} คน'
+                : '⭐ ทุนแนะนำสำหรับคุณ (GPA ปัจจุบัน ${db.currentUser.gpax.toStringAsFixed(2)})',
+            style: AppText.kanit(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: kDark,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             isTeacher
-                ? 'ENGCE302 HW6 รอตรวจ 8 • ENGCE305 Lab6 รอตรวจ 4 — ตัดเกรดภายใน 30 ก.ย.'
-                : 'ทุนเรียนดี คณะวิศวฯ 5,000 บาท • ปิดรับ 30 ก.ย. — เกรดคุณผ่านเกณฑ์ กดสมัครในหน้าข่าวได้เลย',
+                ? 'ENGCE302 ระบบฐานข้อมูล Sec.1 • กำหนดส่งเกรดภายใน 30 ก.ย.'
+                : 'ทุนเรียนดี คณะวิศวฯ 5,000 บาท • ปิดรับ 30 ก.ย. — กดดูรายละเอียดในหน้าข่าวได้เลย',
             style: AppText.kanit(fontSize: 12, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 10),
           PrimaryButton(
             text: isTeacher ? 'ไปตรวจ+ส่งเกรด' : 'ดูรายละเอียด',
-            onPressed: () => Navigator.pushNamed(context, isTeacher ? '/grade-submit' : '/news'),
+            onPressed: () => Navigator.pushNamed(
+              context,
+              isTeacher ? '/grade-submit' : '/news',
+            ),
             backgroundColor: kGold,
             foregroundColor: kDark,
           ),

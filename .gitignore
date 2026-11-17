@@ -61,5 +61,13 @@ app.*.map.json
 *.sql.bak
 supabase/.temp/
 supabase/.branches/
+database/.temp/
 docker-data/
 **/volumes/
+
+# Node.js / Express Middleware & Keys
+**/node_modules/
+npm-debug.log*
+yarn-error.log*
+*.pem
+*.key

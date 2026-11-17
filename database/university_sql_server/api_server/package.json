@@ -1,0 +1,14 @@
+{
+  "name": "rmutp-university-sql-api",
+  "version": "1.0.0",
+  "description": "Node.js + Express REST API Middleware for RMUTP Standard PostgreSQL Database",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "pg": "^8.12.0"
+  }
+}

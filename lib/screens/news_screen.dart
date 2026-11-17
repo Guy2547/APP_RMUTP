@@ -1,47 +1,135 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_bottom_nav.dart';
-import '../services/mock_data.dart';
 
-class NewsScreen extends StatelessWidget {
+class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});
 
   @override
+  State<NewsScreen> createState() => _NewsScreenState();
+}
+
+class _NewsScreenState extends State<NewsScreen> {
+  String _selectedFilter = 'ทั้งหมด';
+
+  void _openCreateAnnouncementDialog(AppDatabaseProvider db) {
+    final titleCtrl = TextEditingController();
+    final detailCtrl = TextEditingController();
+    String selectedType = 'กิจกรรม';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          '📢 ลงประกาศข่าวใหม่ลงฐานข้อมูล',
+          style: AppText.kanit(fontSize: 16, fontWeight: FontWeight.bold, color: kDark),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: selectedType,
+                items: ['ทุน', 'ฝึกงาน', 'กิจกรรม']
+                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) selectedType = v;
+                },
+                decoration: const InputDecoration(labelText: 'หมวดหมู่ประกาศ'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: titleCtrl,
+                decoration: const InputDecoration(labelText: 'หัวข้อประกาศ'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: detailCtrl,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'รายละเอียด'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (titleCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx);
+              await db.publishTeacherAnnouncement(
+                title: titleCtrl.text.trim(),
+                type: selectedType,
+                detail: detailCtrl.text.trim(),
+              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'ลงประกาศใหม่ลงตาราง news_announcements เรียบร้อย ✅',
+                    ),
+                  ),
+                );
+              }
+            },
+            child: const Text('ประกาศ'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final role = context.watch<RoleProvider>().role;
-    final isTeacher = role == AppRole.teacher;
+    final isTeacher = context.watch<RoleProvider>().isTeacher;
+    final db = context.watch<AppDatabaseProvider>();
+    final filteredNews = _selectedFilter == 'ทั้งหมด'
+        ? db.newsList
+        : db.newsList.where((n) => n.type == _selectedFilter).toList();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('📢 ข่าว / ทุน / ฝึกงาน'),
         backgroundColor: kDark,
         foregroundColor: Colors.white,
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                ChipTag(label: 'ทั้งหมด', backgroundColor: kDark, textColor: Colors.white),
-                const SizedBox(width: 6),
-                ChipTag(label: 'ทุน', backgroundColor: Colors.white, textColor: kMid),
-                const SizedBox(width: 6),
-                ChipTag(label: 'ฝึกงาน', backgroundColor: Colors.white, textColor: kMid),
-                const SizedBox(width: 6),
-                ChipTag(label: 'กิจกรรม', backgroundColor: Colors.white, textColor: kMid),
-                if (isTeacher) ...[
-                  const SizedBox(width: 6),
-                  ChipTag(label: 'ประกาศของฉัน', backgroundColor: Colors.white, textColor: kMid),
-                ],
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: ['ทั้งหมด', 'ทุน', 'ฝึกงาน', 'กิจกรรม'].map((cat) {
+                  final active = _selectedFilter == cat;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedFilter = cat),
+                      child: ChipTag(
+                        label: cat,
+                        backgroundColor: active ? kDark : Colors.white,
+                        textColor: active ? Colors.white : kMid,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
             const SizedBox(height: 14),
-            ...MockData.newsList.map((news) {
+            ...filteredNews.map((news) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 child: AppCard(
@@ -56,25 +144,37 @@ class NewsScreen extends StatelessWidget {
                           children: [
                             ChipTag(
                               label: news.type,
-                              backgroundColor: news.type == 'ทุน' ? Colors.amber.withValues(alpha: 0.1) : Colors.white,
-                              textColor: news.type == 'ทุน' ? Colors.amber.shade700 : kMid,
+                              backgroundColor: news.type == 'ทุน'
+                                  ? Colors.amber.withValues(alpha: 0.1)
+                                  : Colors.white,
+                              textColor: news.type == 'ทุน'
+                                  ? Colors.amber.shade700
+                                  : kMid,
                             ),
                           ],
                         ),
                         const SizedBox(height: 6),
                         Text(
                           news.title,
-                          style: AppText.kanit(fontSize: 14, fontWeight: FontWeight.w600, color: kDark),
+                          style: AppText.kanit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: kDark,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           news.detail,
-                          style: AppText.kanit(fontSize: 11, color: Colors.grey.shade600),
+                          style: AppText.kanit(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
                         const SizedBox(height: 10),
                         PrimaryButton(
                           text: news.buttonLabel,
-                          onPressed: () => Navigator.pushNamed(context, '/news-detail'),
+                          onPressed: () =>
+                              Navigator.pushNamed(context, '/news-detail'),
                           backgroundColor: kGold,
                           foregroundColor: kDark,
                         ),
@@ -83,7 +183,7 @@ class NewsScreen extends StatelessWidget {
                   ),
                 ),
               );
-            }).toList(),
+            }),
             if (isTeacher) ...[
               const SizedBox(height: 16),
               AppCard(
@@ -95,17 +195,19 @@ class NewsScreen extends StatelessWidget {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'ประกาศของฉัน: ส่งไปแล้ว 2 • ยอดอ่าน 312',
-                        style: AppText.kanit(fontSize: 12, color: Colors.grey.shade700),
+                        'ประกาศทั้งหมดในระบบ: ${db.newsList.length} เรื่อง',
+                        style: AppText.kanit(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                        ),
                       ),
                     ),
                     TextButton(
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('เปิดฟอร์มลงประกาศ (demo)')),
-                      ),
+                      onPressed: () => _openCreateAnnouncementDialog(db),
                       child: Text(
-                        '+ ลงประกาศในวิชา',
-                        style: AppText.kanit(fontSize: 11, color: kMid).copyWith(decoration: TextDecoration.underline),
+                        '+ ลงประกาศใหม่',
+                        style: AppText.kanit(fontSize: 11, color: kMid)
+                            .copyWith(decoration: TextDecoration.underline),
                       ),
                     ),
                   ],

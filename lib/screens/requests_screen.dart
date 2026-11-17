@@ -1,24 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
-import '../services/mock_data.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_bottom_nav.dart';
 
-class RequestsScreen extends StatelessWidget {
+class RequestsScreen extends StatefulWidget {
   const RequestsScreen({super.key});
 
   @override
+  State<RequestsScreen> createState() => _RequestsScreenState();
+}
+
+class _RequestsScreenState extends State<RequestsScreen> {
+  String _selectedCategory = 'document';
+  final _titleCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final role = context.watch<RoleProvider>().role;
-    final isTeacher = role == AppRole.teacher;
+    final isTeacher = context.watch<RoleProvider>().isTeacher;
+    final db = context.watch<AppDatabaseProvider>();
+    final studentRequests = db.studentRequests;
+    final teacherRequests = db.allRequests;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isTeacher ? '📥 เรื่องที่ต้องอนุมัติ' : '🛠️ แจ้งเรื่อง / ขอเอกสาร'),
+        title: Text(
+          isTeacher ? '📥 เรื่องที่ต้องอนุมัติ' : '🛠️ แจ้งเรื่อง / ขอเอกสาร',
+        ),
         backgroundColor: kDark,
         foregroundColor: Colors.white,
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -33,20 +56,39 @@ class RequestsScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        _reqBtn('🔧', 'แจ้งซ่อม', () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เลือก: แจ้งซ่อม')))),
+                        _reqBtn(
+                          '🔧',
+                          'แจ้งซ่อม',
+                          () => setState(() => _selectedCategory = 'repair'),
+                          active: _selectedCategory == 'repair',
+                        ),
                         const SizedBox(width: 8),
-                        _reqBtn('📄', 'ขอเอกสาร', () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เลือก: ขอเอกสาร'))), active: true),
+                        _reqBtn(
+                          '📄',
+                          'ขอเอกสาร',
+                          () => setState(() => _selectedCategory = 'document'),
+                          active: _selectedCategory == 'document',
+                        ),
                         const SizedBox(width: 8),
-                        _reqBtn('📢', 'ร้องเรียน', () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('เลือก: ร้องเรียน')))),
+                        _reqBtn(
+                          '📢',
+                          'ร้องเรียน',
+                          () => setState(() => _selectedCategory = 'complaint'),
+                          active: _selectedCategory == 'complaint',
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     TextField(
+                      controller: _titleCtrl,
                       decoration: InputDecoration(
-                        hintText: 'ชื่อเรื่องคำขอ',
+                        hintText: 'ชื่อเรื่องคำขอ (เช่น ขอใบรับรอง / แจ้งซ่อมโปรเจกเตอร์)',
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: kBorderLight),
@@ -55,11 +97,15 @@ class RequestsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     TextField(
+                      controller: _descCtrl,
                       decoration: InputDecoration(
                         hintText: 'รายละเอียดคำขอ',
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: kBorderLight),
@@ -69,10 +115,34 @@ class RequestsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     PrimaryButton(
-                      text: 'ส่งคำขอ',
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('ส่งคำขอ #RQ-1042 แล้ว ติดตามด้านล่าง ⬇')),
-                      ),
+                      text: 'ส่งคำขอเข้าฐานข้อมูล',
+                      onPressed: () async {
+                        final title = _titleCtrl.text.trim();
+                        if (title.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('กรุณากรอกชื่อเรื่องคำขอ'),
+                            ),
+                          );
+                          return;
+                        }
+                        final created = await db.submitNewServiceRequest(
+                          category: _selectedCategory,
+                          title: title,
+                          description: _descCtrl.text.trim(),
+                        );
+                        _titleCtrl.clear();
+                        _descCtrl.clear();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'บันทึกคำขอ ${created.id} ลงตาราง service_requests แล้ว ✅',
+                              ),
+                            ),
+                          );
+                        }
+                      },
                       backgroundColor: kDark,
                       foregroundColor: Colors.white,
                     ),
@@ -80,7 +150,7 @@ class RequestsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              ...MockData.requestsStudent.map((r) {
+              ...studentRequests.map((r) {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   child: AppCard(
@@ -94,37 +164,67 @@ class RequestsScreen extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 '${r.id} ${r.title}',
-                                style: AppText.kanit(fontSize: 13, fontWeight: FontWeight.w600, color: kDark),
+                                style: AppText.kanit(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: kDark,
+                                ),
                               ),
                             ),
                             ChipTag(
                               label: r.status,
-                              backgroundColor: r.chipColor.withValues(alpha: 0.1),
+                              backgroundColor:
+                                  r.chipColor.withValues(alpha: 0.1),
                               textColor: r.chipColor,
                             ),
                           ],
                         ),
+                        if (r.description.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            r.description,
+                            style: AppText.kanit(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
                         if (r.progress > 0 && r.progress < 1) ...[
                           const SizedBox(height: 8),
                           LinearProgressIndicator(
                             value: r.progress,
                             backgroundColor: Colors.grey.shade200,
-                            valueColor: AlwaysStoppedAnimation<Color>(r.chipColor),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(r.chipColor),
                           ),
                         ],
                         if (r.status.contains('เสร็จแล้ว')) ...[
-                          Text(
-                            'โหลด PDF',
-                            style: AppText.kanit(fontSize: 11, color: Colors.green).copyWith(decoration: TextDecoration.underline),
+                          const SizedBox(height: 6),
+                          GestureDetector(
+                            onTap: () =>
+                                ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'ดาวน์โหลดเอกสาร PDF ของ ${r.id} จาก Storage แล้ว 📥',
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              '📄 ดาวน์โหลดเอกสาร PDF จาก Storage',
+                              style: AppText.kanit(
+                                fontSize: 11,
+                                color: Colors.green.shade700,
+                              ).copyWith(decoration: TextDecoration.underline),
+                            ),
                           ),
                         ],
                       ],
                     ),
                   ),
                 );
-              }).toList(),
+              }),
             ] else ...[
-              ...MockData.requestsTeacher.map((r) {
+              ...teacherRequests.map((r) {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   child: AppCard(
@@ -137,27 +237,55 @@ class RequestsScreen extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                '${r.id} ${r.title}',
-                                style: AppText.kanit(fontSize: 13, fontWeight: FontWeight.w600, color: kDark),
+                                '${r.id} ${r.title} (${r.studentId})',
+                                style: AppText.kanit(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: kDark,
+                                ),
                               ),
                             ),
                             ChipTag(
-                              label: r.status,
-                              backgroundColor: r.chipColor.withValues(alpha: 0.1),
+                              label: r.statusTeacher,
+                              backgroundColor:
+                                  r.chipColor.withValues(alpha: 0.1),
                               textColor: r.chipColor,
                             ),
                           ],
                         ),
-                        if (r.status == 'รออนุมัติ') ...[
+                        if (r.description.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            r.description,
+                            style: AppText.kanit(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                        if (r.statusTeacher == 'รออนุมัติ') ...[
                           const SizedBox(height: 10),
                           Row(
                             children: [
                               Expanded(
                                 child: PrimaryButton(
                                   text: 'อนุมัติ',
-                                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('อนุมัติ #RQ-1042 แล้ว ✅')),
-                                  ),
+                                  onPressed: () async {
+                                    await db.reviewServiceRequest(
+                                      requestCode: r.id,
+                                      approved: true,
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'อนุมัติคำขอ ${r.id} บันทึกลงฐานข้อมูลแล้ว ✅',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
                                   backgroundColor: kDark,
                                   foregroundColor: Colors.white,
                                 ),
@@ -166,9 +294,22 @@ class RequestsScreen extends StatelessWidget {
                               Expanded(
                                 child: GhostButton(
                                   text: 'ตีกลับ',
-                                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('ตีกลับ #RQ-1042 ให้แก้เอกสาร')),
-                                  ),
+                                  onPressed: () async {
+                                    await db.reviewServiceRequest(
+                                      requestCode: r.id,
+                                      approved: false,
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'ตีกลับคำขอ ${r.id} ในฐานข้อมูลแล้ว',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
                                 ),
                               ),
                             ],
@@ -178,16 +319,7 @@ class RequestsScreen extends StatelessWidget {
                     ),
                   ),
                 );
-              }).toList(),
-              const SizedBox(height: 16),
-              AppCard(
-                padding: const EdgeInsets.all(12),
-                color: Colors.grey.shade50,
-                child: Text(
-                  'อนุมัติแล้ว 12 • ตีกลับ 2 • รอคุณ 1 เรื่อง',
-                  style: AppText.kanit(fontSize: 12, color: Colors.grey.shade600),
-                ),
-              ),
+              }),
             ],
           ],
         ),
@@ -199,7 +331,12 @@ class RequestsScreen extends StatelessWidget {
     );
   }
 
-  Widget _reqBtn(String emoji, String label, VoidCallback onPressed, {bool active = false}) {
+  Widget _reqBtn(
+    String emoji,
+    String label,
+    VoidCallback onPressed, {
+    bool active = false,
+  }) {
     return Expanded(
       child: ElevatedButton(
         onPressed: onPressed,
@@ -207,7 +344,9 @@ class RequestsScreen extends StatelessWidget {
           backgroundColor: active ? kMid : Colors.white,
           foregroundColor: active ? Colors.white : kMid,
           side: BorderSide(color: active ? kMid : kBorderLight),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(vertical: 10),
         ),
         child: Column(
@@ -215,7 +354,10 @@ class RequestsScreen extends StatelessWidget {
           children: [
             Text(emoji, style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 4),
-            Text(label, style: AppText.kanit(fontSize: 10, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: AppText.kanit(fontSize: 10, fontWeight: FontWeight.w600),
+            ),
           ],
         ),
       ),

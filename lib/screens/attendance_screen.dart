@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_bottom_nav.dart';
@@ -9,15 +10,23 @@ class AttendanceScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final role = context.watch<RoleProvider>().role;
-    final isTeacher = role == AppRole.teacher;
+    final isTeacher = context.watch<RoleProvider>().isTeacher;
+    final db = context.watch<AppDatabaseProvider>();
+    final stuId = db.currentUser.studentId ?? '650602001';
+    final myRecord = db.attendanceRecords.firstWhere(
+      (r) => r.studentId == stuId,
+      orElse: () => db.attendanceRecords.first,
+    );
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('✅ เช็คชื่อเข้าเรียน'),
         backgroundColor: kDark,
         foregroundColor: Colors.white,
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -34,21 +43,49 @@ class AttendanceScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     Text(
                       'ENGCE302 • รหัสห้อง DB-0921',
-                      style: AppText.kanit(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                      style: AppText.kanit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'ห้องเปิด 09:00–09:15 • เหลือ 07:32 นาที',
-                      style: AppText.kanit(fontSize: 11, color: Colors.purple.shade200),
+                      db.isAttendanceRoomOpen
+                          ? 'สถานะห้อง: เปิดรับเช็คชื่อ (09:00–09:15)'
+                          : 'สถานะห้อง: ปิดรับเช็คชื่อแล้ว',
+                      style: AppText.kanit(
+                        fontSize: 11,
+                        color: Colors.purple.shade200,
+                      ),
                     ),
                     const SizedBox(height: 14),
                     PrimaryButton(
-                      text: 'กดเช็คชื่อ / สแกน QR',
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('เช็คชื่อสำเร็จ 09:03 ✅')),
-                      ),
-                      backgroundColor: kDark,
-                      foregroundColor: Colors.white,
+                      text: myRecord.status == 'present'
+                          ? 'เช็คชื่อแล้วเมื่อ ${myRecord.checkInTime} ✅'
+                          : 'กดเช็คชื่อ / สแกน QR',
+                      onPressed: () async {
+                        if (!db.isAttendanceRoomOpen) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('อาจารย์ปิดรับเช็คชื่อแล้ว'),
+                            ),
+                          );
+                          return;
+                        }
+                        final time = await db.checkInCurrentStudent();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'บันทึกการเช็คชื่อเวลา $time ลงฐานข้อมูลสำเร็จ ✅',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      backgroundColor: kGold,
+                      foregroundColor: kDark,
                     ),
                   ],
                 ),
@@ -57,8 +94,11 @@ class AttendanceScreen extends StatelessWidget {
               AppCard(
                 padding: const EdgeInsets.all(14),
                 child: Text(
-                  'ประวัติสัปดาห์นี้: มา 4 • สาย 1 • ขาด 0 (92%)',
-                  style: AppText.kanit(fontSize: 12, color: Colors.grey.shade700),
+                  'ผู้ใช้งาน: ${db.currentUser.displayName} • สถานะคาบนี้: ${myRecord.status == 'present' ? 'มาเรียน (${myRecord.checkInTime})' : 'ยังไม่เช็คชื่อ'}',
+                  style: AppText.kanit(
+                    fontSize: 12,
+                    color: Colors.grey.shade700,
+                  ),
                 ),
               ),
             ] else ...[
@@ -68,18 +108,33 @@ class AttendanceScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '👩‍🏫 เปิดห้องเช็คชื่อ — ENGCE302 Sec.1',
-                      style: AppText.kanit(fontSize: 13, fontWeight: FontWeight.w600, color: kDark),
+                      '👩‍🏫 เปิดห้องเช็คชื่อ — ENGCE302 Sec.1 (รหัส DB-0921)',
+                      style: AppText.kanit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: kDark,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
                           child: PrimaryButton(
-                            text: '+ เปิดห้อง',
-                            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('เปิดห้องแล้ว รหัส DB-0921')),
-                            ),
+                            text: db.isAttendanceRoomOpen
+                                ? 'กำลังเปิดรับเช็คชื่อ ✓'
+                                : '+ เปิดห้องเช็คชื่อ',
+                            onPressed: () async {
+                              await db.toggleAttendanceRoom(true);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'เปิดห้องเช็คชื่อ รหัส DB-0921 ในฐานข้อมูลแล้ว',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
                             backgroundColor: kGold,
                             foregroundColor: kDark,
                           ),
@@ -88,9 +143,16 @@ class AttendanceScreen extends StatelessWidget {
                         Expanded(
                           child: GhostButton(
                             text: 'ปิดห้อง',
-                            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('ปิดรับเช็คชื่อแล้ว')),
-                            ),
+                            onPressed: () async {
+                              await db.toggleAttendanceRoom(false);
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('ปิดรับเช็คชื่อแล้ว'),
+                                  ),
+                                );
+                              }
+                            },
                           ),
                         ),
                       ],
@@ -104,48 +166,70 @@ class AttendanceScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'มาแล้ว 28/40',
-                          style: AppText.kanit(fontSize: 13, fontWeight: FontWeight.w600, color: kDark),
-                        ),
-                      ],
+                    Text(
+                      'เข้าเรียนแล้ว ${db.presentAttendanceCount}/${db.attendanceRecords.length} คน',
+                      style: AppText.kanit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: kDark,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     LinearProgressIndicator(
-                      value: 0.7,
+                      value: db.presentAttendanceCount /
+                          db.attendanceRecords.length,
                       backgroundColor: Colors.grey.shade200,
-                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.green,
+                      ),
                     ),
-                    const SizedBox(height: 10),
-                    ...[
-                      '✅ 650602001 มินตรา 09:03',
-                      '✅ 650602002 ภูริ 09:04',
-                    ].map((s) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(s, style: AppText.kanit(fontSize: 11, color: Colors.grey.shade700)),
-                    )),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '⏳ 650602003 — ยังไม่มา',
-                            style: AppText.kanit(fontSize: 11, color: Colors.grey.shade700),
-                          ),
+                    const SizedBox(height: 12),
+                    ...db.attendanceRecords.map((rec) {
+                      final isPresent =
+                          rec.status == 'present' || rec.status == 'late';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                isPresent
+                                    ? '${rec.status == 'late' ? '⚠️' : '✅'} ${rec.studentId} ${rec.studentName} (${rec.checkInTime ?? '-'})'
+                                    : '⏳ ${rec.studentId} ${rec.studentName} — ยังไม่มาเรียน',
+                                style: AppText.kanit(
+                                  fontSize: 11,
+                                  color: isPresent
+                                      ? Colors.grey.shade800
+                                      : Colors.red.shade700,
+                                ),
+                              ),
+                            ),
+                            if (!isPresent)
+                              TextButton(
+                                onPressed: () {
+                                  db.remindStudentViaLine(rec.studentId);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'ส่งแจ้งเตือนไลน์หา ${rec.studentName} แล้ว',
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  rec.remindedViaLine ? 'เตือนแล้ว ✓' : 'เตือนไลน์',
+                                  style: AppText.kanit(
+                                    fontSize: 11,
+                                    color: kMid,
+                                  ).copyWith(
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                        TextButton(
-                          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('ส่งเตือนไลน์หานักศึกษาแล้ว')),
-                          ),
-                          child: Text(
-                            'เตือน',
-                            style: AppText.kanit(fontSize: 11, color: kMid).copyWith(decoration: TextDecoration.underline),
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    }),
                   ],
                 ),
               ),

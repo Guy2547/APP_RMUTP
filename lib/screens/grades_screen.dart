@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
-import '../services/mock_data.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_bottom_nav.dart';
 
@@ -10,23 +10,26 @@ class GradesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final role = context.watch<RoleProvider>().role;
-    final isTeacher = role == AppRole.teacher;
+    final isTeacher = context.watch<RoleProvider>().isTeacher;
+    final db = context.watch<AppDatabaseProvider>();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('🎓 ผลการเรียน'),
         backgroundColor: kDark,
         foregroundColor: Colors.white,
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!isTeacher) ..._buildStudentContent(),
-            if (isTeacher) ..._buildTeacherContent(context),
+            if (!isTeacher) ..._buildStudentContent(db),
+            if (isTeacher) ..._buildTeacherContent(context, db),
           ],
         ),
       ),
@@ -37,7 +40,8 @@ class GradesScreen extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildStudentContent() {
+  List<Widget> _buildStudentContent(AppDatabaseProvider db) {
+    final user = db.currentUser;
     return [
       AppCard(
         padding: const EdgeInsets.all(16),
@@ -45,44 +49,54 @@ class GradesScreen extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              'GPA สะสม',
+              'GPA สะสม (${user.displayName})',
               style: AppText.kanit(fontSize: 11, color: Colors.purple.shade200),
             ),
             const SizedBox(height: 4),
             Text(
-              '3.42',
-              style: AppText.kanit(fontSize: 40, fontWeight: FontWeight.bold, color: kGold),
+              user.gpax.toStringAsFixed(2),
+              style: AppText.kanit(
+                fontSize: 40,
+                fontWeight: FontWeight.bold,
+                color: kGold,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
-              'เทอมนี้ 3.55 • หน่วยกิต 87/132',
+              'เทอมนี้ ${user.currentTermGpa.toStringAsFixed(2)} • หน่วยกิต ${user.earnedCredits}/${user.totalCreditsRequired}',
               style: AppText.kanit(fontSize: 11, color: Colors.purple.shade200),
             ),
           ],
         ),
       ),
       const SizedBox(height: 16),
-      ...MockData.gradesStudent.map((g) {
+      ...db.studentGrades.map((g) {
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  '${g.subjectCode} ${g.subjectName}',
-                  style: AppText.kanit(fontSize: 13, color: Colors.grey.shade800),
+          child: AppCard(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    '${g.subjectCode} ${g.subjectName}',
+                    style: AppText.kanit(
+                      fontSize: 13,
+                      color: Colors.grey.shade800,
+                    ),
+                  ),
                 ),
-              ),
-              Text(
-                g.letter,
-                style: AppText.kanit(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: g.isWarning ? Colors.amber : Colors.green,
+                Text(
+                  g.letter,
+                  style: AppText.kanit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: g.isWarning ? Colors.amber.shade800 : Colors.green,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       }),
@@ -91,14 +105,20 @@ class GradesScreen extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         color: Colors.amber.withValues(alpha: 0.05),
         child: Text(
-          '💡 เกรด C+ วิชาสถิติฉุด GPA — แนะนำลงติวเสริมที่คณะ (ดูในข่าวกิจกรรม)',
+          '💡 เกรดคำนวณอัตโนมัติผ่าน PostgreSQL Trigger (trg_auto_calculate_grade)',
           style: AppText.kanit(fontSize: 12, color: Colors.grey.shade700),
         ),
       ),
     ];
   }
 
-  List<Widget> _buildTeacherContent(BuildContext context) {
+  List<Widget> _buildTeacherContent(
+    BuildContext context,
+    AppDatabaseProvider db,
+  ) {
+    final total = db.teacherGradeRows.length;
+    final submitted = db.submittedGradeCount;
+
     return [
       AppCard(
         padding: const EdgeInsets.all(16),
@@ -111,100 +131,71 @@ class GradesScreen extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '2 วิชา • 78 คน',
-              style: AppText.kanit(fontSize: 28, fontWeight: FontWeight.bold, color: kGold),
+              '${db.teacherTimetable.length} วิชา • $total คน/กลุ่ม',
+              style: AppText.kanit(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: kGold,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
-              'ส่งเกรดแล้ว 28/78 • เหลือ 5 วัน (ปิด 30 ก.ย.)',
+              'ส่งเกรดแล้ว $submitted/$total • ปิดรับเกรด 30 ก.ย.',
               style: AppText.kanit(fontSize: 11, color: Colors.purple.shade200),
             ),
           ],
         ),
       ),
       const SizedBox(height: 16),
-      for (final c in MockData.coursesTeacher)
-        Container(
+      ...db.teacherTimetable.map((sub) {
+        return Container(
           margin: const EdgeInsets.only(bottom: 10),
           child: AppCard(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            c.displayName,
-                            style: AppText.kanit(fontSize: 13, fontWeight: FontWeight.w600, color: kDark),
-                          ),
-                          Text(
-                            c.status,
-                            style: AppText.kanit(fontSize: 10, color: Colors.grey.shade500),
-                          ),
-                        ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${sub.code} — ${sub.name} (${sub.section})',
+                        style: AppText.kanit(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: kDark,
+                        ),
                       ),
-                    ),
-                    PrimaryButton(
-                      text: 'ตรวจ+ส่งเกรด',
-                      onPressed: () => Navigator.pushNamed(context, '/grade-submit'),
-                      backgroundColor: kGold,
-                      foregroundColor: kDark,
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        '${sub.room} • ${sub.teacher}',
+                        style: AppText.kanit(
+                          fontSize: 11,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: c.progress / 100,
-                  backgroundColor: Colors.grey.shade200,
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                ElevatedButton(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, '/grade-submit'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kGold,
+                    foregroundColor: kDark,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                  ),
+                  child: const Text('กรอกเกรด'),
                 ),
               ],
             ),
           ),
-        ),
-      const SizedBox(height: 12),
-      AppCard(
-        padding: const EdgeInsets.all(12),
-        color: Colors.grey.shade50,
-        child: Text(
-          '⏰ เดดไลน์ส่งเกรด 30 ก.ย. • ส่งแล้วล็อกแก้ไข ติดต่อทะเบียนเพื่อปลดล็อก',
-          style: AppText.kanit(fontSize: 11, color: Colors.grey.shade600),
-        ),
-      ),
+        );
+      }),
     ];
-  }
-}
-
-class PrimaryButton extends StatelessWidget {
-  final String text;
-  final VoidCallback onPressed;
-  final Color? backgroundColor;
-  final Color? foregroundColor;
-
-  const PrimaryButton({
-    super.key,
-    required this.text,
-    required this.onPressed,
-    this.backgroundColor,
-    this.foregroundColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: backgroundColor ?? kDark,
-        foregroundColor: foregroundColor ?? Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-      ),
-      child: Text(text),
-    );
   }
 }
