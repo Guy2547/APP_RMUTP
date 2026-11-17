@@ -1,8 +1,8 @@
 // =============================================================================
 // lib/services/database_config.dart
 // การตั้งค่าการเชื่อมต่อฐานข้อมูล 2 ระบบควบคู่กัน (Dual-Database Architecture):
-//   1. ระบบที่ 1: Supabase Cloud API (PostgREST / RPC)
-//   2. ระบบที่ 2: Standard University SQL Server (ผ่าน Node.js/Express Middleware)
+//   1. ระบบที่ 1: Supabase Cloud API (PostgREST / RPC + Session Token & Strict RLS)
+//   2. ระบบที่ 2: Standard University SQL Server (ผ่าน Node.js/Express JWT API)
 // =============================================================================
 
 enum DatabaseBackendMode {
@@ -35,7 +35,7 @@ class DatabaseConfig {
     defaultValue: 'http://localhost:4000/api',
   );
 
-  // Runtime mutable state (รองรับการสลับโหมดสดๆ ในหน้า Login / Profile)
+  // Runtime mutable state (รองรับการสลับโหมดสดๆ ในหน้า Login)
   static DatabaseBackendMode currentMode =
       _envMode == 'university_sql'
           ? DatabaseBackendMode.universitySqlServer
@@ -44,6 +44,9 @@ class DatabaseConfig {
   static String customSupabaseUrl = envSupabaseUrl;
   static String customSupabaseAnonKey = envSupabaseAnonKey;
   static String customUniversityApiUrl = envUniversityApiUrl;
+
+  /// โทเค็นยืนยันตัวตนหลังเข้าสู่ระบบ (JWT สำหรับ Express API หรือ x-session-token สำหรับ Supabase RLS)
+  static String? activeAccessToken;
 
   /// ตรวจสอบว่า Supabase Cloud มีการใส่ URL และ Key แล้วหรือยัง
   static bool get isSupabaseConfigured =>
@@ -60,10 +63,12 @@ class DatabaseConfig {
     return '$cleanUrl/rest/v1';
   }
 
-  /// Headers มาตรฐานสำหรับการเรียก API
+  /// Headers มาตรฐานสำหรับการเรียก API (แนบ JWT Bearer หรือ x-session-token อัตโนมัติ)
   static Map<String, String> get defaultHeaders {
     if (currentMode == DatabaseBackendMode.universitySqlServer) {
       return {
+        if (activeAccessToken != null && activeAccessToken!.isNotEmpty)
+          'Authorization': 'Bearer $activeAccessToken',
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       };
@@ -71,13 +76,15 @@ class DatabaseConfig {
     return {
       'apikey': customSupabaseAnonKey,
       'Authorization': 'Bearer $customSupabaseAnonKey',
+      if (activeAccessToken != null && activeAccessToken!.isNotEmpty)
+        'x-session-token': activeAccessToken!,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation',
     };
   }
 
   // ---------------------------------------------------------------------------
-  // รายชื่อตารางหลัก (Tables) ทั้ง 22 ตารางในฐานข้อมูล
+  // รายชื่อตารางหลัก (Tables) ทั้ง 23 ตารางในฐานข้อมูล
   // ---------------------------------------------------------------------------
   static const String tableFaculties = 'faculties';
   static const String tableDepartments = 'departments';
@@ -101,6 +108,7 @@ class DatabaseConfig {
   static const String tableServiceRequests = 'service_requests';
   static const String tableNewsAnnouncements = 'news_announcements';
   static const String tableNotifications = 'notifications';
+  static const String tableAuditLogs = 'audit_logs';
 
   // ---------------------------------------------------------------------------
   // รายชื่อ Views สำเร็จรูปทั้ง 6 Views

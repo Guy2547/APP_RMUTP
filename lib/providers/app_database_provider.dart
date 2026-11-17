@@ -213,6 +213,7 @@ class AppDatabaseProvider extends ChangeNotifier {
       subjectCode,
       teacherGradeRows,
       submitFinal: submitFinal,
+      teacherId: currentUser.teacherId ?? 'T-1024',
     );
   }
 

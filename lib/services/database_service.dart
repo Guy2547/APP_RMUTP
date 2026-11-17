@@ -10,7 +10,7 @@ import 'database_config.dart';
 /// โมเดลข้อมูลผู้ใช้งานที่เข้าสู่ระบบสำเร็จ
 class AuthenticatedUserSession {
   final String email;
-  final String role; // 'student' | 'teacher'
+  final String role; // 'student' | 'teacher' | 'admin'
   final String? studentId;
   final String? teacherId;
   final String displayName;
@@ -36,7 +36,7 @@ class AuthenticatedUserSession {
   bool get isTeacher => role == 'teacher';
 }
 
-/// โมเดลข้อมูลประวัติเชิงลึกของนักศึกษา (สำหรับแสดงในหน้าโปรไฟล์)
+/// โมเดลข้อมูลประวัติเชิงลึกของนักศึกษา (ใช้ PDPA Masking สำหรับ citizenId)
 class StudentDeepProfile {
   final String studentId;
   final String fullNameTh;
@@ -99,7 +99,7 @@ class FinancialReceiptRecord {
   final double scholarshipDiscount;
   final double totalAmount;
   final String dueDate;
-  final String paymentStatus; // 'paid' | 'verifying' | 'unpaid'
+  final String paymentStatus;
   final String? receiptNo;
   final String? bankName;
   final String? transactionRef;
@@ -143,6 +143,33 @@ class AttendanceRecordItem {
 
 class DatabaseService {
   static const Duration _timeout = Duration(seconds: 6);
+  static const int maxUploadBytes = 5242880; // 5 MB
+  static const List<String> _allowedExtensions = [
+    '.pdf',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.docx',
+  ];
+  static const Set<String> _allowedMimeTypes = {
+    'application/pdf',
+    'image/png',
+    'image/jpeg',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  };
+
+  /// ปกปิดเลขบัตรประชาชนตามหลัก PDPA: 1-xxxx-xxxxx-xx-x
+  static String maskCitizenId(String? rawCid) {
+    final clean = (rawCid ?? '').trim();
+    if (clean.contains('xxxx')) return clean;
+    if (clean.length < 13) return 'x-xxxx-xxxxx-xx-x';
+    return '${clean[0]}-xxxx-xxxxx-${clean.substring(10, 12)}-${clean[12]}';
+  }
+
+  /// ล้าง Session Token เมื่อผู้ใช้ออกจากระบบ
+  static void clearSession() {
+    DatabaseConfig.activeAccessToken = null;
+  }
 
   /// ตรวจสอบว่าสามารถติดต่อ API Server ปัจจุบันได้หรือไม่
   static bool get canCallRemoteApi {
@@ -153,13 +180,14 @@ class DatabaseService {
   }
 
   // ---------------------------------------------------------------------------
-  // 1. ระบบตรวจสอบการเข้าสู่ระบบจริง (sp_authenticate_user)
+  // 1. ระบบตรวจสอบการเข้าสู่ระบบจริง (sp_authenticate_user + เก็บ Token)
   // ---------------------------------------------------------------------------
   static Future<AuthenticatedUserSession?> authenticateUser(
     String email,
     String password,
   ) async {
     final cleanEmail = email.trim().toLowerCase();
+    clearSession();
 
     if (canCallRemoteApi) {
       try {
@@ -181,6 +209,14 @@ class DatabaseService {
           final List<dynamic> data = jsonDecode(res.body);
           if (data.isEmpty) return null;
           final row = data.first as Map<String, dynamic>;
+
+          // เก็บ JWT (Express Mode) หรือ Session Token (Supabase RLS Mode)
+          final token =
+              row['access_token']?.toString() ?? row['session_token']?.toString();
+          if (token != null && token.isNotEmpty) {
+            DatabaseConfig.activeAccessToken = token;
+          }
+
           return AuthenticatedUserSession(
             email: row['email']?.toString() ?? cleanEmail,
             role: row['role']?.toString() ?? 'student',
@@ -200,18 +236,20 @@ class DatabaseService {
                 132,
           );
         }
+        if (res.statusCode == 401 || res.statusCode == 403) {
+          return null;
+        }
       } catch (_) {
-        // Fallback to local verification if offline or before .env is populated
+        // Fallback only if offline / before .env configuration
       }
     }
 
-    // ตรวจสอบกับฐานข้อมูลจำลองในเครื่อง (รหัสผ่านต้องเป็น password123 เท่านั้น)
     if (password != 'password123') return null;
     return _localAccounts[cleanEmail];
   }
 
   // ---------------------------------------------------------------------------
-  // 2. ดึงข้อมูลโปรไฟล์เชิงลึกของนักศึกษา (v_student_profiles)
+  // 2. ดึงข้อมูลโปรไฟล์เชิงลึกของนักศึกษา (v_student_profiles + PDPA Masking)
   // ---------------------------------------------------------------------------
   static Future<StudentDeepProfile> fetchStudentDeepProfile(
     String studentId,
@@ -219,7 +257,7 @@ class DatabaseService {
     if (canCallRemoteApi) {
       try {
         final uri = Uri.parse(
-          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewStudentProfiles}?student_id=eq.$studentId',
+          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewStudentProfiles}?student_id=eq.${Uri.encodeComponent(studentId)}',
         );
         final res = await http
             .get(uri, headers: DatabaseConfig.defaultHeaders)
@@ -233,7 +271,7 @@ class DatabaseService {
               fullNameTh: r['full_name_th']?.toString() ?? '',
               fullNameEn: r['full_name_en']?.toString() ?? '',
               universityEmail: r['university_email']?.toString() ?? '',
-              citizenId: r['citizen_id']?.toString() ?? '-',
+              citizenId: maskCitizenId(r['citizen_id']?.toString()),
               birthDate: r['birth_date']?.toString() ?? '-',
               bloodGroup: r['blood_group']?.toString() ?? 'O',
               facultyNameTh: r['faculty_name_th']?.toString() ?? 'คณะวิศวกรรมศาสตร์',
@@ -280,7 +318,7 @@ class DatabaseService {
     if (canCallRemoteApi) {
       try {
         final uri = Uri.parse(
-          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewStudentFinancialRecords}?student_id=eq.$studentId',
+          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewStudentFinancialRecords}?student_id=eq.${Uri.encodeComponent(studentId)}',
         );
         final res = await http
             .get(uri, headers: DatabaseConfig.defaultHeaders)
@@ -334,7 +372,7 @@ class DatabaseService {
     if (canCallRemoteApi) {
       try {
         final uri = Uri.parse(
-          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewStudentTimetable}?student_id=eq.$studentId',
+          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewStudentTimetable}?student_id=eq.${Uri.encodeComponent(studentId)}',
         );
         final res = await http
             .get(uri, headers: DatabaseConfig.defaultHeaders)
@@ -372,7 +410,7 @@ class DatabaseService {
     if (canCallRemoteApi) {
       try {
         final uri = Uri.parse(
-          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewTeacherTimetable}?teacher_id=eq.$teacherId',
+          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewTeacherTimetable}?teacher_id=eq.${Uri.encodeComponent(teacherId)}',
         );
         final res = await http
             .get(uri, headers: DatabaseConfig.defaultHeaders)
@@ -403,13 +441,13 @@ class DatabaseService {
   }
 
   // ---------------------------------------------------------------------------
-  // 5. ดึงผลการเรียนและใบกรอกคะแนนอาจารย์ + บันทึกเกรดลงฐานข้อมูลจริง
+  // 5. ดึงผลการเรียนและใบกรอกคะแนนอาจารย์ + บันทึกเกรดแบบ Transaction
   // ---------------------------------------------------------------------------
   static Future<List<GradeItem>> fetchStudentGrades(String studentId) async {
     if (canCallRemoteApi) {
       try {
         final uri = Uri.parse(
-          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewStudentGrades}?student_id=eq.$studentId',
+          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewStudentGrades}?student_id=eq.${Uri.encodeComponent(studentId)}',
         );
         final res = await http
             .get(uri, headers: DatabaseConfig.defaultHeaders)
@@ -440,7 +478,7 @@ class DatabaseService {
     if (canCallRemoteApi) {
       try {
         final uri = Uri.parse(
-          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewTeacherGradeSheet}?subject_code=eq.$subjectCode',
+          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.viewTeacherGradeSheet}?subject_code=eq.${Uri.encodeComponent(subjectCode)}',
         );
         final res = await http
             .get(uri, headers: DatabaseConfig.defaultHeaders)
@@ -472,57 +510,80 @@ class DatabaseService {
     String subjectCode,
     List<StudentRow> rows, {
     required bool submitFinal,
+    String teacherId = 'T-1024',
   }) async {
+    // Client-side Input Validation ก่อนส่ง
+    for (final row in rows) {
+      if (row.midterm < 0 ||
+          row.midterm > 30 ||
+          row.finalExam < 0 ||
+          row.finalExam > 40 ||
+          row.coursework < 0 ||
+          row.coursework > 30) {
+        return false;
+      }
+    }
+
     if (!canCallRemoteApi) return true;
     try {
-      for (final row in rows) {
-        final newStatus = submitFinal ? 'ส่งแล้ว' : row.status;
-        final uri = Uri.parse(
-          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.tableEnrollments}?student_id=eq.${row.id}&subject_code=eq.$subjectCode',
-        );
-        await http
-            .patch(
-              uri,
-              headers: DatabaseConfig.defaultHeaders,
-              body: jsonEncode({
-                'midterm_score': row.midterm,
-                'final_score': row.finalExam,
-                'coursework_score': row.coursework,
-                'grade_submit_status': newStatus,
-              }),
-            )
-            .timeout(_timeout);
-      }
-      return true;
+      final uri = Uri.parse(
+        '${DatabaseConfig.activeRestBaseUrl}/rpc/sp_submit_section_grades',
+      );
+      final payload = rows
+          .map(
+            (r) => {
+              'student_id': r.id,
+              'midterm': r.midterm,
+              'final_exam': r.finalExam,
+              'coursework': r.coursework,
+            },
+          )
+          .toList();
+
+      final res = await http
+          .post(
+            uri,
+            headers: DatabaseConfig.defaultHeaders,
+            body: jsonEncode({
+              'p_teacher_id': teacherId,
+              'p_subject_code': subjectCode,
+              'p_grades': payload,
+              'p_submit_final': submitFinal,
+            }),
+          )
+          .timeout(_timeout);
+      return res.statusCode >= 200 && res.statusCode < 300;
     } catch (_) {
       return false;
     }
   }
 
   // ---------------------------------------------------------------------------
-  // 6. ระบบเช็กชื่อเข้าเรียน (Attendance)
+  // 6. ระบบเช็กชื่อเข้าเรียน (ใช้เวลาของ Database Server เท่านั้นผ่าน RPC)
   // ---------------------------------------------------------------------------
   static Future<bool> checkInAttendance({
     required String studentId,
-    required String checkInTime,
+    String? checkInTime, // ไม่ส่งขึ้น Server (Server ใช้ NOW() เสมอเพื่อกันโกงเวลา)
+    String sessionId = '77777777-7777-7777-7777-777777777701',
+    String method = 'qr_scan',
   }) async {
     if (!canCallRemoteApi) return true;
     try {
       final uri = Uri.parse(
-        '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.tableAttendanceRecords}?session_id=eq.77777777-7777-7777-7777-777777777701&student_id=eq.$studentId',
+        '${DatabaseConfig.activeRestBaseUrl}/rpc/sp_check_in_attendance',
       );
-      await http
-          .patch(
+      final res = await http
+          .post(
             uri,
             headers: DatabaseConfig.defaultHeaders,
             body: jsonEncode({
-              'status': 'present',
-              'check_in_time': checkInTime,
-              'check_in_method': 'qr_scan',
+              'p_session_id': sessionId,
+              'p_student_id': studentId,
+              'p_method': method,
             }),
           )
           .timeout(_timeout);
-      return true;
+      return res.statusCode >= 200 && res.statusCode < 300;
     } catch (_) {
       return false;
     }
@@ -534,49 +595,71 @@ class DatabaseService {
       final uri = Uri.parse(
         '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.tableAttendanceSessions}?id=eq.77777777-7777-7777-7777-777777777701',
       );
-      await http
+      final res = await http
           .patch(
             uri,
             headers: DatabaseConfig.defaultHeaders,
             body: jsonEncode({'is_open': isOpen}),
           )
           .timeout(_timeout);
-      return true;
+      return res.statusCode >= 200 && res.statusCode < 300;
     } catch (_) {
       return false;
     }
   }
 
   // ---------------------------------------------------------------------------
-  // 7. ระบบส่งการบ้าน (Assignment Submissions)
+  // 7. ระบบส่งการบ้าน (ตรวจสอบไฟล์/ขนาด/MIME + เทียบ due_date บน Server)
   // ---------------------------------------------------------------------------
+  static bool isValidUploadFile(
+    String fileName, {
+    int fileSizeBytes = 256000,
+    String mimeType = 'application/pdf',
+  }) {
+    final lower = fileName.trim().toLowerCase();
+    if (lower.contains('..') || lower.contains('/') || lower.contains('\\')) {
+      return false;
+    }
+    final hasValidExt = _allowedExtensions.any((ext) => lower.endsWith(ext));
+    if (!hasValidExt) return false;
+    if (!_allowedMimeTypes.contains(mimeType)) return false;
+    if (fileSizeBytes <= 0 || fileSizeBytes > maxUploadBytes) return false;
+    return true;
+  }
+
   static Future<bool> submitAssignment({
     required String studentId,
     required String fileName,
+    int fileSizeBytes = 256000,
+    String mimeType = 'application/pdf',
+    String assignmentId = '66666666-6666-6666-6666-666666666601',
   }) async {
+    if (!isValidUploadFile(
+      fileName,
+      fileSizeBytes: fileSizeBytes,
+      mimeType: mimeType,
+    )) {
+      return false;
+    }
     if (!canCallRemoteApi) return true;
     try {
       final uri = Uri.parse(
-        '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.tableAssignmentSubmissions}',
+        '${DatabaseConfig.activeRestBaseUrl}/rpc/sp_submit_assignment',
       );
-      await http
+      final res = await http
           .post(
             uri,
-            headers: {
-              ...DatabaseConfig.defaultHeaders,
-              'Prefer': 'resolution=merge-duplicates,return=representation',
-            },
+            headers: DatabaseConfig.defaultHeaders,
             body: jsonEncode({
-              'assignment_id': '66666666-6666-6666-6666-666666666601',
-              'student_id': studentId,
-              'file_name': fileName,
-              'file_url':
-                  'https://rmutp.ac.th/storage/v1/object/public/submissions/$fileName',
-              'status': 'submitted',
+              'p_assignment_id': assignmentId,
+              'p_student_id': studentId,
+              'p_original_filename': fileName.trim(),
+              'p_file_size_bytes': fileSizeBytes,
+              'p_mime_type': mimeType,
             }),
           )
           .timeout(_timeout);
-      return true;
+      return res.statusCode >= 200 && res.statusCode < 300;
     } catch (_) {
       return false;
     }
@@ -679,7 +762,7 @@ class DatabaseService {
       final uri = Uri.parse(
         '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.tableServiceRequests}?request_code=eq.$encodedCode',
       );
-      await http
+      final res = await http
           .patch(
             uri,
             headers: DatabaseConfig.defaultHeaders,
@@ -693,14 +776,14 @@ class DatabaseService {
             }),
           )
           .timeout(_timeout);
-      return true;
+      return res.statusCode >= 200 && res.statusCode < 300;
     } catch (_) {
       return false;
     }
   }
 
   // ---------------------------------------------------------------------------
-  // 9. ข่าวสารและการแจ้งเตือน (News & Notifications)
+  // 9. ข่าวสารและการแจ้งเตือน (News Announcements)
   // ---------------------------------------------------------------------------
   static Future<List<NewsItem>> fetchNewsAnnouncements() async {
     if (canCallRemoteApi) {
@@ -836,7 +919,7 @@ class DatabaseService {
         fullNameTh: 'นายภูริ พัฒนากุล',
         fullNameEn: 'Phuri Phattanakul',
         universityEmail: 's650602002@rmutp.ac.th',
-        citizenId: '1100501234502',
+        citizenId: maskCitizenId('1100501234502'),
         birthDate: '2004-08-21',
         bloodGroup: 'A',
         facultyNameTh: 'คณะวิศวกรรมศาสตร์',
@@ -862,7 +945,7 @@ class DatabaseService {
       fullNameTh: 'น.ส.มินตรา ใจดี',
       fullNameEn: 'Mintra Jaidee',
       universityEmail: 's650602001@rmutp.ac.th',
-      citizenId: '1100501234501',
+      citizenId: maskCitizenId('1100501234501'),
       birthDate: '2004-05-14',
       bloodGroup: 'O',
       facultyNameTh: 'คณะวิศวกรรมศาสตร์',
@@ -904,8 +987,7 @@ class DatabaseService {
           bankName: 'ธนาคารไทยพาณิชย์ (SCB)',
           transactionRef: 'SCB2026062211053310',
           paidAt: '22 มิ.ย. 2569 • 11:05 น.',
-          receiptPdfUrl:
-              'https://rmutp.ac.th/storage/v1/object/public/receipts/RCP-2569-00945.pdf',
+          receiptPdfUrl: '/storage/v1/object/authenticated/receipts/RCP-2569-00945.pdf',
         ),
       ];
     }
@@ -924,8 +1006,7 @@ class DatabaseService {
         bankName: 'ธนาคารกรุงไทย (KTB)',
         transactionRef: 'KTB2026062009154421',
         paidAt: '20 มิ.ย. 2569 • 09:15 น.',
-        receiptPdfUrl:
-            'https://rmutp.ac.th/storage/v1/object/public/receipts/RCP-2569-00891.pdf',
+        receiptPdfUrl: '/storage/v1/object/authenticated/receipts/RCP-2569-00891.pdf',
       ),
       FinancialReceiptRecord(
         invoiceNo: 'INV-2568-2-650602001',
@@ -941,8 +1022,7 @@ class DatabaseService {
         bankName: 'ธนาคารกสิกรไทย (KBANK)',
         transactionRef: 'KBANK2025111814221099',
         paidAt: '18 พ.ย. 2568 • 14:22 น.',
-        receiptPdfUrl:
-            'https://rmutp.ac.th/storage/v1/object/public/receipts/RCP-2568-04512.pdf',
+        receiptPdfUrl: '/storage/v1/object/authenticated/receipts/RCP-2568-04512.pdf',
       ),
     ];
   }
