@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-const Color _kPrimary = Color(0xFF4F378B);
+const Color _kPrimary = Color(0xFF4A148C);
+const Color _kBackground = Color(0xFFF7F6FA);
+const Color _kInk = Color(0xFF21172F);
+const Color _kMuted = Color(0xFF756B80);
+const Color _kFieldBorder = Color(0xFFDED6E8);
+const Color _kDivider = Color(0xFFE1DAE8);
+const Color _kOutlineButtonBorder = Color(0xFFD6C6E5);
 const Color _kButtonBorder = Color(0xFF2C2C2C);
+
+const String _kLogoUrl =
+    'https://api.builder.io/api/v1/image/assets/TEMP/88755b0baee069ebe2ea06c92a627386d75fcbfa?width=380';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,6 +23,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -22,177 +32,229 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  TextStyle get _serifBold => GoogleFonts.abhayaLibre(
-        fontSize: 16,
-        fontWeight: FontWeight.w800,
-        color: Colors.black,
-      );
-
-  TextStyle get _fieldStyle => GoogleFonts.kanit(fontSize: 15, color: Colors.black);
+  TextStyle _thai(double size, FontWeight weight, Color color) =>
+      GoogleFonts.notoSansThai(fontSize: size, fontWeight: weight, color: color);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 33, vertical: 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Image.network(
-                      'https://api.builder.io/api/v1/image/assets/TEMP/5c4c262540af8df43d8ecac948e6eba627f650bf?width=570',
-                      width: 285,
-                      height: 285,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 180,
-                        height: 100,
-                        alignment: Alignment.center,
-                        color: _kPrimary,
-                        child: Text(
-                          'RMUTP',
-                          style: GoogleFonts.kanit(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Log in',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.abhayaLibre(
-                      fontSize: 40,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  _field(
-                    label: 'ชื่อผู้ใช้',
-                    hint: 'รหัสนักศึกษา',
-                    controller: _usernameCtrl,
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 20),
-                  _field(
-                    label: 'รหัสผ่าน',
-                    hint: 'รหัสบัตรประชาชน',
-                    controller: _passwordCtrl,
-                    obscure: true,
-                    textInputAction: TextInputAction.done,
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text('Forget Password', style: _serifBold),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 23),
-                    child: SizedBox(
-                      height: 40,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _kPrimary,
-                          foregroundColor: const Color(0xFFF5F5F5),
-                          elevation: 0,
-                          padding: const EdgeInsets.all(8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            side: const BorderSide(color: _kButtonBorder),
-                          ),
-                        ),
-                        child: Text(
-                          'เข้าสู่ระบบ',
-                          style: GoogleFonts.kanit(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w400,
-                            color: const Color(0xFFF5F5F5),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          'Don’t have an Rmutp account?',
-                          style: _serifBold.copyWith(color: Colors.black.withOpacity(0.5)),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      TextButton(
-                        onPressed: () {},
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.black,
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text('Create Account', style: _serifBold),
-                      ),
-                    ],
-                  ),
-                ],
+      backgroundColor: _kBackground,
+      body: Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: _buildForm(context),
+                ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 2, bottom: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.network(
+                _kLogoUrl,
+                width: 190,
+                height: 190,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 190,
+                  height: 190,
+                  alignment: Alignment.center,
+                  child: Text(
+                    'RMUTP',
+                    style: GoogleFonts.inter(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: _kPrimary,
+                    ),
+                  ),
+                ),
+              ),
+              Text(
+                'STUDENT PORTAL',
+                style: GoogleFonts.inter(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: _kMuted,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
+  Widget _buildForm(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Log in',
+          style: GoogleFonts.inter(
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+            height: 1.5,
+            color: _kInk,
+          ),
+        ),
+        Text(
+          'เข้าสู่ระบบบริการนักศึกษา RMUTP',
+          style: _thai(13, FontWeight.w400, _kMuted).copyWith(height: 1.5),
+        ),
+        const SizedBox(height: 18),
+        Text('ชื่อผู้ใช้', style: _thai(13, FontWeight.w500, _kInk)),
+        const SizedBox(height: 7),
+        _field(
+          icon: Icons.badge_outlined,
+          hint: 'รหัสนักศึกษา',
+          controller: _usernameCtrl,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: 22),
+        Text('รหัสผ่าน', style: _thai(13, FontWeight.w500, _kInk)),
+        const SizedBox(height: 7),
+        _field(
+          icon: Icons.lock_outline,
+          hint: 'รหัสบัตรประชาชน',
+          controller: _passwordCtrl,
+          obscure: _obscure,
+          textInputAction: TextInputAction.done,
+          suffix: IconButton(
+            onPressed: () => setState(() => _obscure = !_obscure),
+            icon: Icon(
+              _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              size: 20,
+              color: _kMuted,
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text('ลืมรหัสผ่าน?', style: _thai(12, FontWeight.w500, Colors.black)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kPrimary,
+              foregroundColor: const Color(0xFFF5F5F5),
+              elevation: 0,
+              padding: const EdgeInsets.all(8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: _kButtonBorder),
+              ),
+            ),
+            child: Text(
+              'เข้าสู่ระบบ',
+              style: _thai(15, FontWeight.w600, const Color(0xFFF5F5F5)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            const Expanded(child: Divider(height: 1, thickness: 1, color: _kDivider)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 23),
+              child: Text('หรือ', style: _thai(11, FontWeight.w400, _kMuted)),
+            ),
+            const Expanded(child: Divider(height: 1, thickness: 1, color: _kDivider)),
+          ],
+        ),
+        const SizedBox(height: 19),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            onPressed: () {},
+            style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: _kPrimary,
+              side: const BorderSide(color: _kOutlineButtonBorder),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: Text(
+              'เข้าสู่ระบบด้วย RMUTP',
+              style: _thai(14, FontWeight.w600, _kPrimary),
+            ),
+          ),
+        ),
+        const SizedBox(height: 40),
+        Center(
+          child: Text(
+            'มหาวิทยาลัยเทคโนโลยีราชมงคลพระนคร',
+            style: _thai(10, FontWeight.w400, _kMuted),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _field({
-    required String label,
+    required IconData icon,
     required String hint,
     required TextEditingController controller,
     bool obscure = false,
+    Widget? suffix,
     TextInputType? keyboardType,
     TextInputAction? textInputAction,
   }) {
+    final style = _thai(14, FontWeight.w400, _kInk);
     return Container(
-      height: 42,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 54,
+      padding: const EdgeInsets.only(left: 16, right: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
-        border: Border.all(color: Colors.black),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kFieldBorder),
       ),
       child: Row(
         children: [
-          SizedBox(width: 67, child: Text(label, style: _fieldStyle)),
+          Icon(icon, size: 20, color: _kMuted),
+          const SizedBox(width: 10),
           Expanded(
             child: TextField(
               controller: controller,
               obscureText: obscure,
               keyboardType: keyboardType,
               textInputAction: textInputAction,
-              style: _fieldStyle,
+              style: style,
+              cursorColor: _kPrimary,
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: _fieldStyle.copyWith(color: Colors.black.withOpacity(0.5)),
+                hintStyle: style.copyWith(color: _kMuted),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -202,6 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+          if (suffix != null) suffix else const SizedBox(width: 12),
         ],
       ),
     );
