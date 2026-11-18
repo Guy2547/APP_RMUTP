@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/role_provider.dart';
-import '../widgets/app_theme.dart';
-import '../widgets/role_pill.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+const Color _kPrimary = Color(0xFF4F378B);
+const Color _kButtonBorder = Color(0xFF2C2C2C);
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,136 +12,198 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailCtrl = TextEditingController(text: 's650602xxx@rmutp.ac.th');
-  final _passCtrl = TextEditingController(text: 'password123');
-  bool _obscure = true;
+  final _usernameCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  TextStyle get _serifBold => GoogleFonts.abhayaLibre(
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+        color: Colors.black,
+      );
+
+  TextStyle get _fieldStyle => GoogleFonts.kanit(fontSize: 15, color: Colors.black);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-              Image.network(
-                'https://www.rmutp.ac.th/web2561/wp-content/uploads/2018/06/rmutp-logo.png',
-                height: 64,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 64,
-                  width: 64,
-                  decoration: BoxDecoration(
-                    color: kDark,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(Icons.school, color: Colors.white, size: 32),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'ยินดีต้อนรับสู่ RMUTP',
-                style: AppText.kanit(fontSize: 22, fontWeight: FontWeight.w800, color: kDark),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Rajamangala University of Technology Phra Nakhon',
-                style: AppText.kanit(fontSize: 12, color: Colors.grey.shade500),
-              ),
-              const SizedBox(height: 26),
-              TextField(
-                controller: _emailCtrl,
-                decoration: const InputDecoration(labelText: 'อีเมลมหาวิทยาลัย'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _passCtrl,
-                obscureText: _obscure,
-                decoration: InputDecoration(
-                  labelText: 'รหัสผ่าน',
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: kMid),
-                    onPressed: () => setState(() => _obscure = !_obscure),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('ส่งลิงก์รีเซ็ตรหัสผ่านแล้ว')),
-                  ),
-                  child: const Text(
-                    'ลืมรหัสผ่าน?',
-                    style: TextStyle(color: kMid, fontSize: 12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 33, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: _roleBtn('เข้าใช้: นักศึกษา', AppRole.student, kDark, Colors.white),
+                  Center(
+                    child: Image.network(
+                      'https://api.builder.io/api/v1/image/assets/TEMP/5c4c262540af8df43d8ecac948e6eba627f650bf?width=570',
+                      width: 285,
+                      height: 285,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 180,
+                        height: 100,
+                        alignment: Alignment.center,
+                        color: _kPrimary,
+                        child: Text(
+                          'RMUTP',
+                          style: GoogleFonts.kanit(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _roleBtn('เข้าใช้: อาจารย์', AppRole.teacher, kGold, kDark),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Log in',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.abhayaLibre(
+                      fontSize: 40,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  _field(
+                    label: 'ชื่อผู้ใช้',
+                    hint: 'รหัสนักศึกษา',
+                    controller: _usernameCtrl,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 20),
+                  _field(
+                    label: 'รหัสผ่าน',
+                    hint: 'รหัสบัตรประชาชน',
+                    controller: _passwordCtrl,
+                    obscure: true,
+                    textInputAction: TextInputAction.done,
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text('Forget Password', style: _serifBold),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 23),
+                    child: SizedBox(
+                      height: 40,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _kPrimary,
+                          foregroundColor: const Color(0xFFF5F5F5),
+                          elevation: 0,
+                          padding: const EdgeInsets.all(8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: const BorderSide(color: _kButtonBorder),
+                          ),
+                        ),
+                        child: Text(
+                          'เข้าสู่ระบบ',
+                          style: GoogleFonts.kanit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                            color: const Color(0xFFF5F5F5),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Don’t have an Rmutp account?',
+                          style: _serifBold.copyWith(color: Colors.black.withOpacity(0.5)),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      TextButton(
+                        onPressed: () {},
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text('Create Account', style: _serifBold),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Text(
-                'Demo: กดปุ่มใดก็ได้เพื่อเข้าแอป ไม่ต้องใช้รหัสจริง',
-                style: AppText.kanit(fontSize: 11, color: Colors.grey.shade400),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: RolePill(
-                      label: '🎓 นักศึกษา',
-                      active: context.watch<RoleProvider>().isStudent,
-                      onTap: () {
-                        context.read<RoleProvider>().setRole(AppRole.student);
-                        Navigator.pushNamed(context, '/home');
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: RolePill(
-                      label: '👩‍🏫 อาจารย์',
-                      active: context.watch<RoleProvider>().isTeacher,
-                      onTap: () {
-                        context.read<RoleProvider>().setRole(AppRole.teacher);
-                        Navigator.pushNamed(context, '/home');
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _roleBtn(String text, AppRole role, Color bgColor, Color textColor) {
-    final isActive = context.watch<RoleProvider>().role == role;
-    return ElevatedButton(
-      onPressed: () {
-        context.read<RoleProvider>().setRole(role);
-        Navigator.pushNamed(context, '/home');
-      },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isActive ? bgColor : Colors.white,
-        foregroundColor: isActive ? textColor : const Color(0xFF9A93AD),
-        side: BorderSide(color: isActive ? bgColor : kBorderLight),
-        elevation: 0,
+  Widget _field({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    bool obscure = false,
+    TextInputType? keyboardType,
+    TextInputAction? textInputAction,
+  }) {
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        border: Border.all(color: Colors.black),
       ),
-      child: Text(text),
+      child: Row(
+        children: [
+          SizedBox(width: 67, child: Text(label, style: _fieldStyle)),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              obscureText: obscure,
+              keyboardType: keyboardType,
+              textInputAction: textInputAction,
+              style: _fieldStyle,
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: _fieldStyle.copyWith(color: Colors.black.withOpacity(0.5)),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

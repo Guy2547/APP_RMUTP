@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/forgot_password_screen.dart';
 import 'screens/timetable_screen.dart';
 import 'screens/courses_screen.dart';
 import 'screens/course_detail_screen.dart';
@@ -39,6 +40,7 @@ class RMUTPApp extends StatelessWidget {
       initialRoute: '/login',
       routes: {
         '/login': (context) => const LoginScreen(),
+        '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/home': (context) => const HomeScreen(),
         '/timetable': (context) => const TimetableScreen(),
         '/courses': (context) => const CoursesScreen(),
