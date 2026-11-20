@@ -9,6 +9,11 @@ final List<BottomNavItem> kBottomNavItems = [
   BottomNavItem(route: '/profile', label: 'โปรไฟล์', icon: Icons.person),
 ];
 
+/// คำนวณ padding ล่างที่เหมาะสมกับ safe area ของอุปกรณ์ (รวม home indicator ของ iPhone)
+double bottomPadding(BuildContext context, {double extra = 16.0}) {
+  return MediaQuery.of(context).padding.bottom + extra;
+}
+
 class CustomBottomNav extends StatefulWidget {
   final String currentRoute;
   final ValueChanged<String>? onTap;
@@ -24,16 +29,20 @@ class CustomBottomNav extends StatefulWidget {
 }
 
 class _CustomBottomNavState extends State<CustomBottomNav> {
-  bool _isNavigating = false;
+  String? _lastTappedRoute;
+  DateTime? _lastTapTime;
 
   void _onItemTapped(String route) {
-    if (_isNavigating) return;
-    setState(() => _isNavigating = true);
+    final now = DateTime.now();
+    // กันกดซ้ำเร็วเกินไป (ภายใน 500ms) และกันกด route เดิมซ้ำ
+    if (_lastTappedRoute == route &&
+        _lastTapTime != null &&
+        now.difference(_lastTapTime!) < const Duration(milliseconds: 500)) {
+      return;
+    }
+    _lastTappedRoute = route;
+    _lastTapTime = now;
     widget.onTap?.call(route);
-    // ปลดล็อคหลังจาก 600 มิลลิวินาที เพื่อป้องกันการกดซ้ำเร็วเกินไป
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (mounted) setState(() => _isNavigating = false);
-    });
   }
 
   @override
@@ -63,9 +72,7 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
                       Icon(
                         item.icon,
                         size: 22,
-                        color: _isNavigating
-                            ? Colors.grey.shade400
-                            : (active ? kDark : const Color(0xFF9A93AD)),
+                        color: active ? kDark : const Color(0xFF9A93AD),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -73,9 +80,7 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
                         style: AppText.kanit(
                           fontSize: 11,
                           fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                          color: _isNavigating
-                              ? Colors.grey.shade400
-                              : (active ? kDark : const Color(0xFF9A93AD)),
+                          color: active ? kDark : const Color(0xFF9A93AD),
                         ),
                       ),
                       if (active)
@@ -98,6 +103,3 @@ class _CustomBottomNavState extends State<CustomBottomNav> {
     );
   }
 }
-
-/// ความสูงของแถบนำทางด้านล่าง รวมเซฟเอเรีย สำหรับเว้นพื้นที่ล่างของจอ
-const double kBottomNavHeight = 80.0;

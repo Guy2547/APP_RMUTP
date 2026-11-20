@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, kBottomNavHeight;
+import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, bottomPadding;
 
 class CourseDetailScreen extends StatelessWidget {
   const CourseDetailScreen({super.key});
@@ -25,7 +25,7 @@ class CourseDetailScreen extends StatelessWidget {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, kBottomNavHeight + 16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

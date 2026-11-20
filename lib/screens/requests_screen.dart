@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, kBottomNavHeight;
+import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, bottomPadding;
 
 class RequestsScreen extends StatefulWidget {
   const RequestsScreen({super.key});
@@ -234,7 +234,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, kBottomNavHeight + 16),
+                    padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding(context)),
                     itemCount: filtered.length,
                     itemBuilder: (_, i) {
                       final r = filtered[i];

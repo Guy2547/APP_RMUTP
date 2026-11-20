@@ -4,7 +4,7 @@ import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../services/database_service.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, kBottomNavHeight;
+import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, bottomPadding;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -36,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, kBottomNavHeight + 16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -117,11 +117,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Quick stats grid
+            // Quick stats grid — ใช้ Column+Row แทน GridView เพื่อหลีกเลี่ยง overflow
             _buildStatsGrid(db, isTeacher, user),
             const SizedBox(height: 20),
 
-            // Current class card
+            // Current class card — Stack แนวตั้งแทน Row+Expanded
             _buildCurrentClassCard(context, db, isTeacher),
             const SizedBox(height: 20),
 
@@ -179,43 +179,56 @@ class _HomeScreenState extends State<HomeScreen> {
       0,
       (sum, item) => sum + item.pendingAssignments,
     );
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.7,
+    return Column(
       children: [
-        _statCard(
-          title: isTeacher ? 'วิชาที่สอน' : 'GPA เทอมนี้',
-          value: isTeacher
-              ? '${db.teacherTimetable.length}'
-              : user.currentTermGpa.toStringAsFixed(2),
-          icon: Icons.analytics,
-          color: kDark,
+        Row(
+          children: [
+            Expanded(
+              child: _statCard(
+                title: isTeacher ? 'วิชาที่สอน' : 'GPA เทอมนี้',
+                value: isTeacher
+                    ? '${db.teacherTimetable.length}'
+                    : user.currentTermGpa.toStringAsFixed(2),
+                icon: Icons.analytics,
+                color: kDark,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _statCard(
+                title: isTeacher ? 'นศ.ในห้องวันนี้' : 'เข้าเรียน',
+                value: isTeacher
+                    ? '${db.attendanceRecords.length} คน'
+                    : '${db.presentAttendanceCount}/${db.attendanceRecords.length}',
+                icon: Icons.check_circle,
+                color: kGold,
+              ),
+            ),
+          ],
         ),
-        _statCard(
-          title: isTeacher ? 'นศ.ในห้องวันนี้' : 'เข้าเรียน',
-          value: isTeacher
-              ? '${db.attendanceRecords.length} คน'
-              : '${db.presentAttendanceCount}/${db.attendanceRecords.length}',
-          icon: Icons.check_circle,
-          color: kGold,
-        ),
-        _statCard(
-          title: isTeacher ? 'รอส่งเกรด' : 'งานค้างส่ง',
-          value: isTeacher
-              ? '${db.teacherGradeRows.where((r) => r.status != 'ส่งแล้ว').length}'
-              : '$pendingHw',
-          icon: Icons.assignment_late,
-          color: Colors.orange.shade700,
-        ),
-        _statCard(
-          title: 'ทุน / กิจกรรม',
-          value: '3 รายการ',
-          icon: Icons.card_membership,
-          color: kMid,
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _statCard(
+                title: isTeacher ? 'รอส่งเกรด' : 'งานค้างส่ง',
+                value: isTeacher
+                    ? '${db.teacherGradeRows.where((r) => r.status != 'ส่งแล้ว').length}'
+                    : '$pendingHw',
+                icon: Icons.assignment_late,
+                color: Colors.orange.shade700,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _statCard(
+                title: 'ทุน / กิจกรรม',
+                value: '3 รายการ',
+                icon: Icons.card_membership,
+                color: kMid,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -277,172 +290,169 @@ class _HomeScreenState extends State<HomeScreen> {
         ? (db.teacherTimetable.isNotEmpty ? db.teacherTimetable.first : null)
         : (db.studentTimetable.isNotEmpty ? db.studentTimetable.first : null);
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          flex: 3,
-          child: AppCard(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      isTeacher ? '👩‍🏫 กำลังสอนตอนนี้' : '⏰ กำลังเรียนตอนนี้',
-                      style: AppText.kanit(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: kDark,
-                      ),
-                    ),
-                    if (firstSub != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          firstSub.status,
-                          style: AppText.kanit(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.green.shade700,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (firstSub != null) ...[
+        // Card ปัจจุบัน
+        AppCard(
+          color: Colors.white,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   Text(
-                    firstSub.displayName,
+                    isTeacher ? '👩‍🏫 กำลังสอนตอนนี้' : '⏰ กำลังเรียนตอนนี้',
                     style: AppText.kanit(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                       color: kDark,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${firstSub.time} • ${firstSub.room} • ${firstSub.teacher}',
-                    style: AppText.kanit(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
+                  if (firstSub != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        firstSub.status,
+                        style: AppText.kanit(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
                     ),
-                  ),
-                ] else ...[
-                  Text(
-                    'ENGCE302 — ระบบฐานข้อมูล (Sec.1)',
-                    style: AppText.kanit(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: kDark,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '09:00–12:00 • ห้อง 1604 • อ.สุรชัย',
-                    style: AppText.kanit(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
                 ],
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 36,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/attendance'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isTeacher ? kGold : kDark,
-                      foregroundColor: isTeacher ? kDark : Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Text(
-                      isTeacher ? 'เปิดห้องเช็คชื่อ' : 'เช็คชื่อ / สแกน QR',
-                      style: AppText.kanit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          flex: 2,
-          child: AppCard(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+              ),
+              const SizedBox(height: 8),
+              if (firstSub != null) ...[
                 Text(
-                  'แจ้งเตือนล่าสุด',
+                  firstSub.displayName,
                   style: AppText.kanit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
                     color: kDark,
                   ),
                 ),
-                const SizedBox(height: 8),
-                ...db.notifications.take(3).map((n) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: n.accentColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                n.title,
-                                style: AppText.kanit(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: kDark,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                n.subtitle,
-                                style: AppText.kanit(
-                                  fontSize: 10,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
+                const SizedBox(height: 4),
+                Text(
+                  '${firstSub.time} • ${firstSub.room} • ${firstSub.teacher}',
+                  style: AppText.kanit(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ] else ...[
+                Text(
+                  'ENGCE302 — ระบบฐานข้อมูล (Sec.1)',
+                  style: AppText.kanit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: kDark,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '09:00–12:00 • ห้อง 1604 • อ.สุรชัย',
+                  style: AppText.kanit(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
               ],
-            ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 36,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pushNamed(context, '/attendance'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isTeacher ? kGold : kDark,
+                    foregroundColor: isTeacher ? kDark : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    isTeacher ? 'เปิดห้องเช็คชื่อ' : 'เช็คชื่อ / สแกน QR',
+                    style: AppText.kanit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Card แจ้งเตือน (แนวตั้งแทน Row+Expanded)
+        AppCard(
+          color: Colors.white,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'แจ้งเตือนล่าสุด',
+                style: AppText.kanit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: kDark,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...db.notifications.take(3).map((n) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: n.accentColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              n.title,
+                              style: AppText.kanit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: kDark,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              n.subtitle,
+                              style: AppText.kanit(
+                                fontSize: 10,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
           ),
         ),
       ],
@@ -587,5 +597,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
-
