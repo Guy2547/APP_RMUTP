@@ -53,6 +53,15 @@ class DatabaseConfig {
       customSupabaseUrl.trim().isNotEmpty &&
       customSupabaseAnonKey.trim().isNotEmpty;
 
+  /// Alias ของ isSupabaseConfigured (ใช้ร่วมกับโหมดฐานข้อมูลทั่วไป)
+  static bool get isConfigured => isSupabaseConfigured;
+
+  /// Alias ของ activeRestBaseUrl (ชื่อย่อสำหรับใช้ในชั้นบริการ)
+  static String get restApiUrl => activeRestBaseUrl;
+
+  /// URL ของ Supabase Cloud ปัจจุบัน
+  static String get supabaseUrl => customSupabaseUrl;
+
   /// Base URL ปัจจุบันตามโหมดที่เลือก (ตัด /rest/v1 ซ้ำซ้อนให้อัตโนมัติหากมีการใส่มาเกิน)
   static String get activeRestBaseUrl {
     if (currentMode == DatabaseBackendMode.universitySqlServer) {

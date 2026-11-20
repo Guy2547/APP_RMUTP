@@ -13,63 +13,69 @@ class TimetableScreen extends StatefulWidget {
 }
 
 class _TimetableScreenState extends State<TimetableScreen> {
-  String _day = 'mon';
+  String _selectedDay = 'MON';
 
-  final Map<String, String> dayLabels = {
-    'all': 'ทุกวัน',
-    'mon': 'จันทร์',
-    'tue': 'อังคาร',
-    'wed': 'พุธ',
-    'thu': 'พฤหัส',
-    'fri': 'ศุกร์',
-  };
+  final List<Map<String, String>> _days = [
+    {'key': 'MON', 'label': 'จันทร์'},
+    {'key': 'TUE', 'label': 'อังคาร'},
+    {'key': 'WED', 'label': 'พุธ'},
+    {'key': 'THU', 'label': 'พฤหัสบดี'},
+    {'key': 'FRI', 'label': 'ศุกร์'},
+    {'key': 'SAT', 'label': 'เสาร์'},
+  ];
 
   @override
   Widget build(BuildContext context) {
     final isTeacher = context.watch<RoleProvider>().isTeacher;
     final db = context.watch<AppDatabaseProvider>();
-    final items = _day == 'all'
-        ? (isTeacher ? db.teacherTimetable : db.studentTimetable)
-        : db.getTimetableForDay(isTeacher, _day);
+    final items = db.getTimetableForDay(isTeacher, _selectedDay);
 
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: Text(
-          isTeacher ? '🗓️ ตารางสอน — เทอม 1/2569' : '🗓️ ตารางเรียน — เทอม 1/2569',
+          isTeacher ? 'ตารางสอน' : 'ตารางเรียน',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        backgroundColor: kDark,
-        foregroundColor: Colors.white,
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: kDark),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Column(
         children: [
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 36,
+          // Day selector tabs
+          Container(
+            height: 44,
+            margin: const EdgeInsets.all(16),
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              children: ['mon', 'tue', 'wed', 'thu', 'fri', 'all'].map((d) {
-                final active = _day == d;
+              children: _days.map((d) {
+                final active = _selectedDay == d['key'];
                 return GestureDetector(
-                  onTap: () => setState(() => _day = d),
+                  onTap: () => setState(() => _selectedDay = d['key']!),
                   child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
                       color: active ? kDark : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: active ? kDark : kBorderLight),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: active ? kDark : kBorderLight,
+                      ),
                     ),
                     child: Center(
                       child: Text(
-                        dayLabels[d]!,
+                        d['label']!,
                         style: AppText.kanit(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
                           color: active ? Colors.white : kMid,
                         ),
                       ),
@@ -79,13 +85,28 @@ class _TimetableScreenState extends State<TimetableScreen> {
               }).toList(),
             ),
           ),
-          const SizedBox(height: 10),
+
+          // Timetable list
           Expanded(
             child: items.isEmpty
                 ? Center(
-                    child: Text(
-                      'ไม่มีคาบเรียนในวัน${dayLabels[_day]}',
-                      style: AppText.kanit(fontSize: 13, color: Colors.grey.shade500),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.event_busy,
+                          size: 48,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'ไม่มีวิชาในวันนี้',
+                          style: AppText.kanit(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 : ListView.builder(
@@ -94,57 +115,127 @@ class _TimetableScreenState extends State<TimetableScreen> {
                     itemBuilder: (_, i) {
                       final item = items[i];
                       return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
+                        margin: const EdgeInsets.only(bottom: 12),
                         child: AppCard(
-                          padding: const EdgeInsets.all(12),
-                          border: const Border(
-                            left: BorderSide(color: kMid, width: 5),
-                          ),
-                          child: InkWell(
-                            onTap: () => Navigator.pushNamed(context, '/course-detail'),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        item.displayName,
+                          color: Colors.white,
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  color: kDark.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        item.time.split('–').first,
                                         style: AppText.kanit(
                                           fontSize: 14,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight: FontWeight.w800,
                                           color: kDark,
                                         ),
                                       ),
-                                    ),
-                                    if (item.status.isNotEmpty)
-                                      ChipTag(
-                                        label: item.status,
-                                        backgroundColor:
-                                            Colors.green.withValues(alpha: 0.1),
-                                        textColor: Colors.green.shade700,
+                                      Text(
+                                        item.time.split('–').last,
+                                        style: AppText.kanit(
+                                          fontSize: 10,
+                                          color: kMid,
+                                        ),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            item.displayName,
+                                            style: AppText.kanit(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w800,
+                                              color: kDark,
+                                            ),
+                                          ),
+                                        ),
+                                        if (item.progress > 0)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 3,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.green
+                                                  .withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(
+                                                6,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              item.status,
+                                              style: AppText.kanit(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.green.shade700,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${item.room} • ${item.teacher}',
+                                      style: AppText.kanit(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'ห้องเรียน ${item.room}',
+                                          style: AppText.kanit(
+                                            fontSize: 11,
+                                            color: Colors.grey.shade500,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        if (item.pendingAssignments > 0)
+                                          Text(
+                                            'งานค้าง ${item.pendingAssignments}',
+                                            style: AppText.kanit(
+                                              fontSize: 11,
+                                              color: Colors.orange.shade700,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    LinearProgressIndicator(
+                                      value: item.progress / 100,
+                                      backgroundColor: Colors.grey.shade200,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        item.progress >= 70 ? kMid : kGold,
+                                      ),
+                                    ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${item.time} • ${item.room} • ${item.teacher}',
-                                  style: AppText.kanit(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                                if (item.progress > 0) ...[
-                                  const SizedBox(height: 8),
-                                  LinearProgressIndicator(
-                                    value: item.progress / 100,
-                                    backgroundColor: Colors.grey.shade200,
-                                    valueColor: const AlwaysStoppedAnimation<Color>(kMid),
-                                  ),
-                                ],
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       );
@@ -156,35 +247,6 @@ class _TimetableScreenState extends State<TimetableScreen> {
       bottomNavigationBar: CustomBottomNav(
         currentRoute: '/timetable',
         onTap: (route) => Navigator.pushNamed(context, route),
-      ),
-    );
-  }
-}
-
-class ChipTag extends StatelessWidget {
-  final String label;
-  final Color backgroundColor;
-  final Color textColor;
-
-  const ChipTag({
-    super.key,
-    required this.label,
-    this.backgroundColor = Colors.white,
-    this.textColor = kMid,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        border: backgroundColor == Colors.white ? Border.all(color: kBorderLight) : null,
-      ),
-      child: Text(
-        label,
-        style: AppText.kanit(fontSize: 11, fontWeight: FontWeight.w600, color: textColor),
       ),
     );
   }

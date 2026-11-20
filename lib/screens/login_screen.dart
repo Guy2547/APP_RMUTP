@@ -37,9 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.red.shade700,
-          content: Text(
-            dbProvider.lastError ?? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
-          ),
+          content: Text(dbProvider.lastError ?? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'),
         ),
       );
       return;
@@ -139,12 +137,13 @@ class _LoginScreenState extends State<LoginScreen> {
         dbProvider.backendMode == DatabaseBackendMode.supabaseCloud;
 
     return Scaffold(
+      backgroundColor: kBg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             children: [
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Image.network(
                 'https://www.rmutp.ac.th/web2561/wp-content/uploads/2018/06/rmutp-logo.png',
                 height: 64,
@@ -174,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 18),
 
-              // แถบสลับโหมดฐานข้อมูล 2 ระบบ (Supabase Cloud API <-> University SQL Server)
+              // แถบสลับโหมดฐานข้อมูล 2 ระบบ
               AppCard(
                 padding: const EdgeInsets.all(10),
                 color: Colors.white,
@@ -230,9 +229,20 @@ class _LoginScreenState extends State<LoginScreen> {
               TextField(
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'อีเมลมหาวิทยาลัย (@rmutp.ac.th)',
-                  prefixIcon: Icon(Icons.alternate_email, size: 18, color: kMid),
+                  prefixIcon: const Icon(Icons.alternate_email, size: 18, color: kMid),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: kBorderLight),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: kMid, width: 2),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -249,17 +259,24 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: kBorderLight),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: kMid, width: 2),
+                  ),
                 ),
               ),
               const SizedBox(height: 6),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('ส่งคำขอรีเซ็ตรหัสผ่านไปยังอีเมลมหาวิทยาลัยแล้ว'),
-                    ),
-                  ),
+                  onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
                   child: const Text(
                     'ลืมรหัสผ่าน?',
                     style: TextStyle(color: kMid, fontSize: 12),
@@ -303,7 +320,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '📋 บัญชีผู้ใช้ในฐานข้อมูล (รหัสผ่าน: password123):',
+                      '📋 บัญชีทดสอบ (รหัสผ่าน: password123):',
                       style: AppText.kanit(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,

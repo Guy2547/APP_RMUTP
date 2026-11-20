@@ -2,333 +2,179 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
+import '../services/database_service.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_bottom_nav.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
-  void _showDeepProfileSheet(BuildContext context, AppDatabaseProvider db) {
-    final p = db.studentProfile;
-    final u = db.currentUser;
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.75,
-        maxChildSize: 0.92,
-        builder: (_, controller) => ListView(
-          controller: controller,
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text(
-              '👤 ข้อมูลทะเบียนประวัตินักศึกษา (v_student_profiles)',
-              style: AppText.kanit(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: kDark,
-              ),
-            ),
-            const Divider(height: 24),
-            _infoRow('รหัสนักศึกษา', p?.studentId ?? u.studentId ?? '650602001'),
-            _infoRow('ชื่อ-นามสกุล (ไทย)', p?.fullNameTh ?? u.displayName),
-            _infoRow('ชื่อ-นามสกุล (EN)', p?.fullNameEn ?? 'Mintra Jaidee'),
-            _infoRow('อีเมลมหาวิทยาลัย', p?.universityEmail ?? u.email),
-            _infoRow('เลขบัตรประชาชน', p?.citizenId ?? '1100501234501'),
-            _infoRow(
-              'วันเกิด / กรุ๊ปเลือด',
-              '${p?.birthDate ?? '2004-05-14'} • กรุ๊ปเลือด ${p?.bloodGroup ?? 'O'}',
-            ),
-            _infoRow(
-              'คณะ / ศูนย์พื้นที่',
-              '${p?.facultyNameTh ?? 'คณะวิศวกรรมศาสตร์'} (${p?.campus ?? 'ศูนย์พระนครเหนือ'})',
-            ),
-            _infoRow(
-              'สาขาวิชา / หลักสูตร',
-              '${p?.departmentNameTh ?? 'วิศวกรรมคอมพิวเตอร์'} • ${p?.degreeNameTh ?? 'วศ.บ.'}',
-            ),
-            _infoRow('อาจารย์ที่ปรึกษา', p?.advisorName ?? 'อ.สุรชัย วงศ์ใหญ่'),
-            _infoRow(
-              'GPAX / หน่วยกิตสะสม',
-              '${u.gpax.toStringAsFixed(2)} • ${p?.creditsProgressLabel ?? '${u.earnedCredits}/${u.totalCreditsRequired}'} หน่วยกิต',
-            ),
-            _infoRow('เบอร์โทรศัพท์ / Line', '${p?.phone ?? '092-345-6789'} • Line: ${p?.lineId ?? 'mintra_ce65'}'),
-            _infoRow('ที่อยู่ปัจจุบัน (หอพัก)', p?.currentAddress ?? 'หอพักนักศึกษาเคียงมอ ห้อง 402 ซ.วงศ์สว่าง 11'),
-            _infoRow('ที่อยู่ตามทะเบียนบ้าน', p?.permanentAddress ?? '99/12 หมู่ 4 ถ.พิบูลสงคราม บางซื่อ กรุงเทพมหานคร 10800'),
-            _infoRow(
-              'ผู้ติดต่อฉุกเฉิน',
-              '${p?.emergencyContactName ?? 'นางสมศรี ใจดี'} (${p?.emergencyContactRelation ?? 'มารดา'}) • ${p?.emergencyContactPhone ?? '081-999-8877'}',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+class _ProfileScreenState extends State<ProfileScreen> {
+  int _selectedTab = 0;
 
-  void _showFinancialReceiptsSheet(BuildContext context, AppDatabaseProvider db) {
-    final records = db.financialRecords;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: kBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.72,
-        maxChildSize: 0.92,
-        builder: (_, controller) => ListView(
-          controller: controller,
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text(
-              '🧾 ใบแจ้งหนี้ค่าเทอมและใบเสร็จรับเงิน (v_student_financial_records)',
-              style: AppText.kanit(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: kDark,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...records.map((rec) {
-              final isPaid = rec.paymentStatus == 'paid';
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: AppCard(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'ภาคการศึกษา ${rec.termLabel} (${rec.invoiceNo})',
-                            style: AppText.kanit(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: kDark,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isPaid
-                                  ? Colors.green.withValues(alpha: 0.1)
-                                  : Colors.amber.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              isPaid ? 'ชำระแล้ว ✓' : 'รอตรวจสอบ',
-                              style: AppText.kanit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: isPaid
-                                    ? Colors.green.shade700
-                                    : Colors.amber.shade800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 16),
-                      _infoRow('ค่าหน่วยกิต/เหมาจ่าย', '${rec.tuitionFee.toStringAsFixed(0)} บาท'),
-                      _infoRow('ค่าบำรุงมหาวิทยาลัย + ปฏิบัติการ', '${(rec.universityFee + rec.labEquipmentFee).toStringAsFixed(0)} บาท'),
-                      if (rec.scholarshipDiscount > 0)
-                        _infoRow('ส่วนลดทุนเรียนดี', '-${rec.scholarshipDiscount.toStringAsFixed(0)} บาท'),
-                      _infoRow('ยอดชำระสุทธิ', '${rec.totalAmount.toStringAsFixed(2)} บาท'),
-                      if (rec.receiptNo != null) ...[
-                        _infoRow('เลขที่ใบเสร็จ (e-Receipt)', rec.receiptNo!),
-                        _infoRow('ช่องทางชำระ / ธนาคาร', '${rec.bankName ?? '-'} (${rec.transactionRef ?? '-'})'),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              Navigator.pop(ctx);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'ดาวน์โหลดใบเสร็จ ${rec.receiptNo}.pdf จาก Storage แล้ว 📥',
-                                  ),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.picture_as_pdf, size: 16),
-                            label: Text('ดาวน์โหลดใบเสร็จ ${rec.receiptNo} (PDF)'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kDark,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 145,
-            child: Text(
-              label,
-              style: AppText.kanit(fontSize: 12, color: Colors.grey.shade600),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppText.kanit(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: kDark,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  final List<String> _tabs = ['ข้อมูลส่วนตัว', 'เกรดสะสม'];
 
   @override
   Widget build(BuildContext context) {
     final isTeacher = context.watch<RoleProvider>().isTeacher;
     final db = context.watch<AppDatabaseProvider>();
     final user = db.currentUser;
-    final avatarChar = isTeacher ? 'ส' : 'ม';
 
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
-        title: const Text('โปรไฟล์'),
-        backgroundColor: kDark,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('โปรไฟล์',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: kDark),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            AppCard(
-              padding: const EdgeInsets.all(20),
-              color: kDark,
-              child: Column(
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: kGold,
-                      borderRadius: BorderRadius.circular(32),
+      body: Column(
+        children: [
+          // Profile header (purple card)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [kDark, kMain],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(30),
+                bottomRight: Radius.circular(30),
+              ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(44),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      width: 2,
                     ),
-                    child: Center(
-                      child: Text(
-                        avatarChar,
-                        style: AppText.kanit(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: kDark,
+                  ),
+                  child: const Icon(Icons.person, color: Colors.white, size: 40),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  user.displayName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isTeacher
+                      ? '${user.subtitleInfo} • อาจารย์ประจำภาควิชา'
+                      : '${user.subtitleInfo} • ปี ${_yearLevel(user.studentId)}',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _profileStat(
+                        label: 'รหัสนักศึกษา',
+                        value: user.studentId ?? 'T-1024',
+                      ),
+                    ),
+                    Expanded(
+                      child: _profileStat(
+                        label: 'GPA สะสม',
+                        value: user.gpax.toStringAsFixed(2),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pushNamed(context, '/grades'),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: kGold),
+                      foregroundColor: kGold,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      'ดูรายละเอียดเกรด',
+                      style: AppText.kanit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Tabs
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: _tabs.asMap().entries.map((e) {
+                final active = _selectedTab == e.key;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedTab = e.key),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: active ? kDark : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: active ? kDark : kBorderLight,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          e.value,
+                          style: AppText.kanit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: active ? Colors.white : kMid,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    user.displayName,
-                    style: AppText.kanit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    user.subtitleInfo,
-                    style: AppText.kanit(
-                      fontSize: 12,
-                      color: Colors.purple.shade200,
-                    ),
-                  ),
-                ],
-              ),
+                );
+              }).toList(),
             ),
-            const SizedBox(height: 16),
-            AppCard(
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  _profileRow(
-                    '👤',
-                    'ข้อมูลส่วนตัวเชิงลึก (ทะเบียนประวัติ)',
-                    () => _showDeepProfileSheet(context, db),
-                  ),
-                  if (!isTeacher)
-                    _profileRow(
-                      '🧾',
-                      'ประวัติค่าเทอมและใบเสร็จรับเงิน (e-Receipt)',
-                      () => _showFinancialReceiptsSheet(context, db),
-                    ),
-                  _profileRow(
-                    '🌐',
-                    'ภาษา / Language',
-                    () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('ภาษา: ไทย ✓')),
-                    ),
-                  ),
-                  _profileRow(
-                    '🔔',
-                    'การแจ้งเตือน',
-                    () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('เปิด/ปิดแจ้งเตือนแล้ว')),
-                    ),
-                  ),
-                  _profileRow(
-                    '🚪',
-                    'ออกจากระบบ',
-                    () => Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/login',
-                      (route) => false,
-                    ),
-                    textColor: Colors.red.shade600,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'RMUTP Campus App v0.1 • UI Prototype เพื่อการศึกษา • สีตาม rmutp.ac.th',
-              style: AppText.kanit(fontSize: 10, color: Colors.grey.shade400),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+
+          // Tab content
+          Expanded(
+            child: _selectedTab == 0
+                ? _buildInfoTab(user, isTeacher, db)
+                : _buildGradesTab(db),
+          ),
+        ],
       ),
       bottomNavigationBar: CustomBottomNav(
         currentRoute: '/profile',
@@ -337,24 +183,255 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _profileRow(
-    String emoji,
-    String label,
-    VoidCallback onTap, {
-    Color? textColor,
+  Widget _profileStat({
+    required String label,
+    required String value,
   }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.8),
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoTab(AuthenticatedUserSession user,
+      bool isTeacher, AppDatabaseProvider db) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'ข้อมูลส่วนตัว',
+            style: AppText.kanit(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: kDark,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _infoRow('ชื่อ - สกุล', user.displayName),
+          _infoRow('รหัสนักศึกษา', user.studentId ?? 'T-1024'),
+          _infoRow('อีเมลมหาวิทยาลัย', db.currentUser.email),
+          _infoRow('คณะ', 'คณะวิศวกรรมศาสตร์'),
+          _infoRow('สาขา', 'วิศวกรรมคอมพิวเตอร์'),
+          _infoRow('ปีการศึกษา', _yearLevel(user.studentId)),
+          _infoRow('เกรดเฉลี่ยสะสม', user.gpax.toStringAsFixed(2)),
+          _infoRow('หน่วยกิตสะสม', '${user.earnedCredits} / ${user.totalCreditsRequired}'),
+          const SizedBox(height: 20),
+          AppCard(
+            color: Colors.white,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'การตั้งค่า',
+                  style: AppText.kanit(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: kDark,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _settingRow('ภาษา', 'ไทย 🇹🇭', () {}),
+                _settingRow('การแจ้งเตือน', 'เปิดใช้งาน', () {
+                  Navigator.pushNamed(context, '/notif');
+                }),
+                _settingRow('ความปลอดภัย', 'เปลี่ยนรหัสผ่าน', () {
+                  Navigator.pushNamed(context, '/forgot-password');
+                }),
+                _settingRow('ออกจากระบบ', '', () {
+                  db.currentUser = db.currentUser; // placeholder
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/login',
+                    (route) => false,
+                  );
+                }, isDestructive: true),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 150,
+            child: Text(
+              label,
+              style: AppText.kanit(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: AppText.kanit(
+                fontSize: 12,
+                color: kDark,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _settingRow(String title, String subtitle, VoidCallback onTap,
+      {bool isDestructive = false}) {
     return ListTile(
-      leading: Text(emoji, style: const TextStyle(fontSize: 20)),
+      contentPadding: EdgeInsets.zero,
       title: Text(
-        label,
+        title,
         style: AppText.kanit(
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: textColor ?? kDark,
+          color: isDestructive ? Colors.red.shade700 : kDark,
         ),
       ),
-      trailing: const Icon(Icons.chevron_right, color: kMid),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (subtitle.isNotEmpty)
+            Text(
+              subtitle,
+              style: AppText.kanit(
+                fontSize: 11,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          const SizedBox(width: 8),
+          const Icon(
+            Icons.chevron_right,
+            color: kMid,
+            size: 20,
+          ),
+        ],
+      ),
       onTap: onTap,
     );
   }
+
+  Widget _buildGradesTab(AppDatabaseProvider db) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'ประวัติเกรดทั้งหมด',
+            style: AppText.kanit(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: kDark,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...db.studentGrades.map((g) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              child: AppCard(
+                color: Colors.white,
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: _gradeColor(g.score).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          g.letter.split(' ').first,
+                          style: TextStyle(
+                            color: _gradeColor(g.score),
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${g.subjectCode} ${g.subjectName}',
+                            style: AppText.kanit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: kDark,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'คะแนน ${g.score.toStringAsFixed(1)} / 4.00',
+                            style: AppText.kanit(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Color _gradeColor(double score) {
+    if (score >= 3.5) return Colors.green.shade600;
+    if (score >= 3.0) return Colors.green.shade500;
+    if (score >= 2.5) return Colors.amber.shade600;
+    if (score >= 2.0) return Colors.orange.shade600;
+    return Colors.red.shade600;
+  }
+
+  String _yearLevel(String? studentId) {
+    if (studentId == null || studentId.isEmpty) return '-';
+    final year = int.tryParse(studentId.substring(1, 3)) ?? 25;
+    final currentYear = 2569; // พ.ศ. ปัจจุบัน
+    final entered = 2500 + year;
+    final level = currentYear - entered + 1;
+    return 'ปี $level';
+  }
 }
+
+

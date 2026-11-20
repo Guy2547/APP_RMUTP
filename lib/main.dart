@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
+import 'screens/forgot_password_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/timetable_screen.dart';
 import 'screens/courses_screen.dart';
@@ -14,9 +15,9 @@ import 'screens/news_detail_screen.dart';
 import 'screens/notif_screen.dart';
 import 'screens/requests_screen.dart';
 import 'screens/help_screen.dart';
+import 'screens/profile_screen.dart';
 import 'providers/role_provider.dart';
 import 'providers/app_database_provider.dart';
-import 'screens/profile_screen.dart';
 import 'widgets/app_theme.dart';
 
 void main() {
@@ -40,6 +41,7 @@ class RMUTPApp extends StatelessWidget {
         initialRoute: '/login',
         routes: {
           '/login': (context) => const LoginScreen(),
+          '/forgot-password': (context) => const ForgotPasswordScreen(),
           '/home': (context) => const HomeScreen(),
           '/timetable': (context) => const TimetableScreen(),
           '/courses': (context) => const CoursesScreen(),

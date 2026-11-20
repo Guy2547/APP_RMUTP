@@ -4,9 +4,9 @@ import 'app_theme.dart';
 final List<BottomNavItem> kBottomNavItems = [
   BottomNavItem(route: '/home', label: 'หน้าแรก', icon: Icons.home),
   BottomNavItem(route: '/timetable', label: 'ตาราง', icon: Icons.calendar_today),
-  BottomNavItem(route: '/courses', label: 'วิชา', icon: Icons.book),
-  BottomNavItem(route: '/news', label: 'ข่าว', icon: Icons.article),
-  BottomNavItem(route: '/profile', label: 'ฉัน', icon: Icons.person),
+  BottomNavItem(route: '/grades', label: 'เกรด', icon: Icons.grade),
+  BottomNavItem(route: '/requests', label: 'คำร้อง', icon: Icons.description),
+  BottomNavItem(route: '/profile', label: 'โปรไฟล์', icon: Icons.person),
 ];
 
 class CustomBottomNav extends StatelessWidget {

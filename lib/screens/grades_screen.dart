@@ -1,25 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
-import '../providers/role_provider.dart';
 import '../widgets/app_theme.dart';
 import '../widgets/custom_bottom_nav.dart';
 
-class GradesScreen extends StatelessWidget {
+class GradesScreen extends StatefulWidget {
   const GradesScreen({super.key});
 
   @override
+  State<GradesScreen> createState() => _GradesScreenState();
+}
+
+class _GradesScreenState extends State<GradesScreen> {
+  String _selectedTerm = 'ภาคเรียนที่ 1/2569';
+
+  final List<String> _terms = [
+    'ภาคเรียนที่ 1/2569',
+    'ภาคเรียนที่ 2/2568',
+    'ภาคเรียนที่ 1/2568',
+  ];
+
+  @override
   Widget build(BuildContext context) {
-    final isTeacher = context.watch<RoleProvider>().isTeacher;
     final db = context.watch<AppDatabaseProvider>();
+    final user = db.currentUser;
 
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
-        title: const Text('🎓 ผลการเรียน'),
-        backgroundColor: kDark,
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('ผลการเรียน',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: kDark),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -28,8 +43,233 @@ class GradesScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!isTeacher) ..._buildStudentContent(db),
-            if (isTeacher) ..._buildTeacherContent(context, db),
+            // Term selector
+            Row(
+              children: [
+                Text(
+                  'เลือกภาคเรียน',
+                  style: AppText.kanit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: kDark,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedTerm,
+                      items: _terms
+                          .map((t) => DropdownMenuItem(
+                                value: t,
+                                child: Text(
+                                  t,
+                                  style: AppText.kanit(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setState(() => _selectedTerm = v!),
+                      dropdownColor: kDark,
+                      style: AppText.kanit(
+                        fontSize: 12,
+                        color: Colors.white,
+                      ),
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // GPA card
+            AppCard(
+              color: kDark,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Text(
+                    'GPA สะสม (${user.displayName})',
+                    style: AppText.kanit(
+                      fontSize: 12,
+                      color: Colors.purple.shade200,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        user.gpax.toStringAsFixed(2),
+                        style: const TextStyle(
+                          color: kGold,
+                          fontSize: 48,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        children: [
+                          Text(
+                            'เทอมนี้',
+                            style: AppText.kanit(
+                              fontSize: 11,
+                              color: Colors.purple.shade200,
+                            ),
+                          ),
+                          Text(
+                            user.currentTermGpa.toStringAsFixed(2),
+                            style: AppText.kanit(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: kGold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'หน่วยกิตสะสม ${user.earnedCredits}/${user.totalCreditsRequired} • เกรดเฉลี่ยภาคเรียน ${user.currentTermGpa.toStringAsFixed(2)}',
+                    style: AppText.kanit(
+                      fontSize: 11,
+                      color: Colors.purple.shade200,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Subject grades list
+            Text(
+              'รายวิชาที่ลงทะเบียน',
+              style: AppText.kanit(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: kDark,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...db.studentGrades.map((g) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: AppCard(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: _gradeColor(g.score).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Center(
+                          child: Text(
+                            g.letter.split(' ').first,
+                            style: TextStyle(
+                              color: _gradeColor(g.score),
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${g.subjectCode} ${g.subjectName}',
+                              style: AppText.kanit(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: kDark,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: g.isWarning
+                                        ? Colors.amber.withValues(alpha: 0.1)
+                                        : Colors.green.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    g.isWarning ? 'ต้องปรับปรุง' : 'ผ่านเกณฑ์',
+                                    style: AppText.kanit(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                      color: g.isWarning
+                                          ? Colors.amber.shade700
+                                          : Colors.green.shade700,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${g.score.toStringAsFixed(1)} / 4.00',
+                                  style: AppText.kanit(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (g.isWarning) ...[
+                        const Icon(Icons.warning_amber, color: Colors.amber, size: 20),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 20),
+            AppCard(
+              color: Colors.amber.withValues(alpha: 0.05),
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'เกรดคำนวณอัตโนมัติผ่านระบบฐานข้อมูล (PostgreSQL Trigger)',
+                      style: AppText.kanit(
+                        fontSize: 11,
+                        color: Colors.amber.shade800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -40,162 +280,11 @@ class GradesScreen extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildStudentContent(AppDatabaseProvider db) {
-    final user = db.currentUser;
-    return [
-      AppCard(
-        padding: const EdgeInsets.all(16),
-        color: kDark,
-        child: Column(
-          children: [
-            Text(
-              'GPA สะสม (${user.displayName})',
-              style: AppText.kanit(fontSize: 11, color: Colors.purple.shade200),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              user.gpax.toStringAsFixed(2),
-              style: AppText.kanit(
-                fontSize: 40,
-                fontWeight: FontWeight.bold,
-                color: kGold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'เทอมนี้ ${user.currentTermGpa.toStringAsFixed(2)} • หน่วยกิต ${user.earnedCredits}/${user.totalCreditsRequired}',
-              style: AppText.kanit(fontSize: 11, color: Colors.purple.shade200),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 16),
-      ...db.studentGrades.map((g) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: AppCard(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    '${g.subjectCode} ${g.subjectName}',
-                    style: AppText.kanit(
-                      fontSize: 13,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                ),
-                Text(
-                  g.letter,
-                  style: AppText.kanit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: g.isWarning ? Colors.amber.shade800 : Colors.green,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }),
-      const SizedBox(height: 12),
-      AppCard(
-        padding: const EdgeInsets.all(12),
-        color: Colors.amber.withValues(alpha: 0.05),
-        child: Text(
-          '💡 เกรดคำนวณอัตโนมัติผ่าน PostgreSQL Trigger (trg_auto_calculate_grade)',
-          style: AppText.kanit(fontSize: 12, color: Colors.grey.shade700),
-        ),
-      ),
-    ];
-  }
-
-  List<Widget> _buildTeacherContent(
-    BuildContext context,
-    AppDatabaseProvider db,
-  ) {
-    final total = db.teacherGradeRows.length;
-    final submitted = db.submittedGradeCount;
-
-    return [
-      AppCard(
-        padding: const EdgeInsets.all(16),
-        color: kDark,
-        child: Column(
-          children: [
-            Text(
-              'วิชาที่สอนเทอมนี้',
-              style: AppText.kanit(fontSize: 11, color: Colors.purple.shade200),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${db.teacherTimetable.length} วิชา • $total คน/กลุ่ม',
-              style: AppText.kanit(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: kGold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'ส่งเกรดแล้ว $submitted/$total • ปิดรับเกรด 30 ก.ย.',
-              style: AppText.kanit(fontSize: 11, color: Colors.purple.shade200),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 16),
-      ...db.teacherTimetable.map((sub) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: AppCard(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${sub.code} — ${sub.name} (${sub.section})',
-                        style: AppText.kanit(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: kDark,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${sub.room} • ${sub.teacher}',
-                        style: AppText.kanit(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () =>
-                      Navigator.pushNamed(context, '/grade-submit'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kGold,
-                    foregroundColor: kDark,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                  ),
-                  child: const Text('กรอกเกรด'),
-                ),
-              ],
-            ),
-          ),
-        );
-      }),
-    ];
+  Color _gradeColor(double score) {
+    if (score >= 3.5) return Colors.green.shade600;
+    if (score >= 3.0) return Colors.green.shade500;
+    if (score >= 2.5) return Colors.amber.shade600;
+    if (score >= 2.0) return Colors.orange.shade600;
+    return Colors.red.shade600;
   }
 }

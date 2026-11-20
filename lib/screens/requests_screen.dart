@@ -13,316 +13,357 @@ class RequestsScreen extends StatefulWidget {
 }
 
 class _RequestsScreenState extends State<RequestsScreen> {
-  String _selectedCategory = 'document';
-  final _titleCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
+  String _selectedCategory = 'all'; // all, repair, document, complaint
 
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _descCtrl.dispose();
-    super.dispose();
-  }
+  final List<Map<String, String>> _categories = [
+    {'key': 'all', 'label': 'ทั้งหมด'},
+    {'key': 'repair', 'label': 'แจ้งซ่อม'},
+    {'key': 'document', 'label': 'ขอเอกสาร'},
+    {'key': 'complaint', 'label': 'ร้องเรียน'},
+  ];
 
   @override
   Widget build(BuildContext context) {
     final isTeacher = context.watch<RoleProvider>().isTeacher;
     final db = context.watch<AppDatabaseProvider>();
-    final studentRequests = db.studentRequests;
-    final teacherRequests = db.allRequests;
+    final requests = isTeacher ? db.allRequests : db.studentRequests;
+
+    final filtered = requests.where((r) {
+      if (_selectedCategory == 'all') return true;
+      return r.category == _selectedCategory;
+    }).toList();
 
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: Text(
-          isTeacher ? '📥 เรื่องที่ต้องอนุมัติ' : '🛠️ แจ้งเรื่อง / ขอเอกสาร',
+          isTeacher ? 'เรื่องที่ต้องอนุมัติ' : 'แจ้งเรื่อง / ขอเอกสาร',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        backgroundColor: kDark,
-        foregroundColor: Colors.white,
+        centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: kDark),
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!isTeacher) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        _reqBtn(
-                          '🔧',
-                          'แจ้งซ่อม',
-                          () => setState(() => _selectedCategory = 'repair'),
-                          active: _selectedCategory == 'repair',
-                        ),
-                        const SizedBox(width: 8),
-                        _reqBtn(
-                          '📄',
-                          'ขอเอกสาร',
-                          () => setState(() => _selectedCategory = 'document'),
-                          active: _selectedCategory == 'document',
-                        ),
-                        const SizedBox(width: 8),
-                        _reqBtn(
-                          '📢',
-                          'ร้องเรียน',
-                          () => setState(() => _selectedCategory = 'complaint'),
-                          active: _selectedCategory == 'complaint',
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _titleCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'ชื่อเรื่องคำขอ (เช่น ขอใบรับรอง / แจ้งซ่อมโปรเจกเตอร์)',
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: kBorderLight),
-                        ),
+      body: Column(
+        children: [
+          // Category tabs
+          Container(
+            height: 44,
+            margin: const EdgeInsets.all(16),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: _categories.map((c) {
+                final active = _selectedCategory == c['key'];
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedCategory = c['key']!),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: active ? kDark : Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: active ? kDark : kBorderLight,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _descCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'รายละเอียดคำขอ',
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: kBorderLight),
+                    child: Center(
+                      child: Text(
+                        c['label']!,
+                        style: AppText.kanit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: active ? Colors.white : kMid,
                         ),
                       ),
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 16),
-                    PrimaryButton(
-                      text: 'ส่งคำขอเข้าฐานข้อมูล',
-                      onPressed: () async {
-                        final title = _titleCtrl.text.trim();
-                        if (title.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('กรุณากรอกชื่อเรื่องคำขอ'),
-                            ),
-                          );
-                          return;
-                        }
-                        final created = await db.submitNewServiceRequest(
-                          category: _selectedCategory,
-                          title: title,
-                          description: _descCtrl.text.trim(),
-                        );
-                        _titleCtrl.clear();
-                        _descCtrl.clear();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'บันทึกคำขอ ${created.id} ลงตาราง service_requests แล้ว ✅',
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      backgroundColor: kDark,
-                      foregroundColor: Colors.white,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              ...studentRequests.map((r) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  child: AppCard(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                '${r.id} ${r.title}',
-                                style: AppText.kanit(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: kDark,
-                                ),
-                              ),
-                            ),
-                            ChipTag(
-                              label: r.status,
-                              backgroundColor:
-                                  r.chipColor.withValues(alpha: 0.1),
-                              textColor: r.chipColor,
-                            ),
-                          ],
-                        ),
-                        if (r.description.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            r.description,
-                            style: AppText.kanit(
-                              fontSize: 11,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                        if (r.progress > 0 && r.progress < 1) ...[
-                          const SizedBox(height: 8),
-                          LinearProgressIndicator(
-                            value: r.progress,
-                            backgroundColor: Colors.grey.shade200,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(r.chipColor),
-                          ),
-                        ],
-                        if (r.status.contains('เสร็จแล้ว')) ...[
-                          const SizedBox(height: 6),
-                          GestureDetector(
-                            onTap: () =>
-                                ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'ดาวน์โหลดเอกสาร PDF ของ ${r.id} จาก Storage แล้ว 📥',
-                                ),
-                              ),
-                            ),
-                            child: Text(
-                              '📄 ดาวน์โหลดเอกสาร PDF จาก Storage',
-                              style: AppText.kanit(
-                                fontSize: 11,
-                                color: Colors.green.shade700,
-                              ).copyWith(decoration: TextDecoration.underline),
-                            ),
-                          ),
-                        ],
-                      ],
                     ),
                   ),
                 );
-              }),
-            ] else ...[
-              ...teacherRequests.map((r) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  child: AppCard(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                '${r.id} ${r.title} (${r.studentId})',
-                                style: AppText.kanit(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: kDark,
-                                ),
-                              ),
+              }).toList(),
+            ),
+          ),
+
+          // Request form (student only)
+          if (!isTeacher) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'สร้างคำร้องใหม่',
+                    style: AppText.kanit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: kDark,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _selectedCategory == 'all'
+                              ? 'document'
+                              : _selectedCategory,
+                          decoration: InputDecoration(
+                            labelText: 'หมวดหมู่',
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
                             ),
-                            ChipTag(
-                              label: r.statusTeacher,
-                              backgroundColor:
-                                  r.chipColor.withValues(alpha: 0.1),
-                              textColor: r.chipColor,
-                            ),
-                          ],
-                        ),
-                        if (r.description.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            r.description,
-                            style: AppText.kanit(
-                              fontSize: 11,
-                              color: Colors.grey.shade600,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: kBorderLight),
                             ),
                           ),
-                        ],
-                        if (r.statusTeacher == 'รออนุมัติ') ...[
-                          const SizedBox(height: 10),
-                          Row(
+                          items: [
+                            {'key': 'repair', 'label': 'แจ้งซ่อม'},
+                            {'key': 'document', 'label': 'ขอเอกสาร'},
+                            {'key': 'complaint', 'label': 'ร้องเรียน'},
+                          ].map((c) => DropdownMenuItem(
+                                value: c['key'],
+                                child: Text(
+                                  c['label']!,
+                                  style: AppText.kanit(fontSize: 12),
+                                ),
+                              )).toList(),
+                          onChanged: (v) => setState(() {
+                            _selectedCategory = v!;
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          decoration: InputDecoration(
+                            labelText: 'ชื่อเรื่องคำขอ',
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: kBorderLight),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: 'รายละเอียดคำขอ',
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: kBorderLight),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 40,
+                    child: ElevatedButton(
+                      onPressed: () => ScaffoldMessenger.of(context)
+                          .showSnackBar(const SnackBar(
+                        content: Text('สร้างคำร้องเรียบร้อยแล้ว'),
+                      )),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kDark,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: Text(
+                        'ส่งคำขอ',
+                        style: AppText.kanit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Request list
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.assignment_outlined,
+                          size: 48,
+                          color: Colors.grey.shade300,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'ไม่มีคำร้องในหมวดนี้',
+                          style: AppText.kanit(
+                            fontSize: 14,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final r = filtered[i];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: AppCard(
+                          color: Colors.white,
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: PrimaryButton(
-                                  text: 'อนุมัติ',
-                                  onPressed: () async {
-                                    await db.reviewServiceRequest(
-                                      requestCode: r.id,
-                                      approved: true,
-                                    );
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'อนุมัติคำขอ ${r.id} บันทึกลงฐานข้อมูลแล้ว ✅',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                  backgroundColor: kDark,
-                                  foregroundColor: Colors.white,
-                                ),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      r.title,
+                                      style: AppText.kanit(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: kDark,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: r.chipColor
+                                          .withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      isTeacher
+                                          ? r.statusTeacher
+                                          : r.status,
+                                      style: AppText.kanit(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: r.chipColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: GhostButton(
-                                  text: 'ตีกลับ',
-                                  onPressed: () async {
-                                    await db.reviewServiceRequest(
-                                      requestCode: r.id,
-                                      approved: false,
-                                    );
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'ตีกลับคำขอ ${r.id} ในฐานข้อมูลแล้ว',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                                ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(
+                                    r.category == 'repair'
+                                        ? Icons.build
+                                        : r.category == 'document'
+                                            ? Icons.description
+                                            : Icons.report,
+                                    size: 16,
+                                    color: kMid,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _categoryLabel(r.category),
+                                    style: AppText.kanit(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    r.id,
+                                    style: AppText.kanit(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade500,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
+                              if (r.progress > 0 && r.progress < 1) ...[
+                                const SizedBox(height: 8),
+                                LinearProgressIndicator(
+                                  value: r.progress,
+                                  backgroundColor: Colors.grey.shade200,
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(
+                                        r.chipColor,
+                                      ),
+                                ),
+                              ],
+                              if (r.status.contains('เสร็จแล้ว')) ...[
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 36,
+                                  child: OutlinedButton(
+                                    onPressed: () =>
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                      content:
+                                          Text('ดาวน์โหลดเอกสาร PDF แล้ว 📥'),
+                                    )),
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: kMid),
+                                      foregroundColor: kMid,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          8,
+                                        ),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '📄 ดาวน์โหลด PDF',
+                                      style: AppText.kanit(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
-                        ],
-                      ],
-                    ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              }),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
       bottomNavigationBar: CustomBottomNav(
         currentRoute: '/requests',
@@ -331,119 +372,16 @@ class _RequestsScreenState extends State<RequestsScreen> {
     );
   }
 
-  Widget _reqBtn(
-    String emoji,
-    String label,
-    VoidCallback onPressed, {
-    bool active = false,
-  }) {
-    return Expanded(
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: active ? kMid : Colors.white,
-          foregroundColor: active ? Colors.white : kMid,
-          side: BorderSide(color: active ? kMid : kBorderLight),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 16)),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: AppText.kanit(fontSize: 10, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class PrimaryButton extends StatelessWidget {
-  final String text;
-  final VoidCallback onPressed;
-  final Color? backgroundColor;
-  final Color? foregroundColor;
-
-  const PrimaryButton({
-    super.key,
-    required this.text,
-    required this.onPressed,
-    this.backgroundColor,
-    this.foregroundColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: backgroundColor ?? kDark,
-        foregroundColor: foregroundColor ?? Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-      ),
-      child: Text(text),
-    );
-  }
-}
-
-class GhostButton extends StatelessWidget {
-  final String text;
-  final VoidCallback onPressed;
-
-  const GhostButton({
-    super.key,
-    required this.text,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: kMid),
-        foregroundColor: kMid,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-      ),
-      child: Text(text),
-    );
-  }
-}
-
-class ChipTag extends StatelessWidget {
-  final String label;
-  final Color backgroundColor;
-  final Color textColor;
-
-  const ChipTag({
-    super.key,
-    required this.label,
-    this.backgroundColor = Colors.white,
-    this.textColor = kMid,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        border: backgroundColor == Colors.white ? Border.all(color: kBorderLight) : null,
-      ),
-      child: Text(
-        label,
-        style: AppText.kanit(fontSize: 11, fontWeight: FontWeight.w600, color: textColor),
-      ),
-    );
+  String _categoryLabel(String category) {
+    switch (category) {
+      case 'repair':
+        return 'แจ้งซ่อม';
+      case 'document':
+        return 'ขอเอกสาร';
+      case 'complaint':
+        return 'ร้องเรียน';
+      default:
+        return 'คำร้อง';
+    }
   }
 }
