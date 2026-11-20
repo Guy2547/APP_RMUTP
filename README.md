@@ -118,6 +118,18 @@ flutter build web
 
 5 แท็บหลัก: หน้าแรก / ตาราง / เกรด / คำร้อง / โปรไฟล์
 
+## ปัญหาที่พบและวิธีแก้ไข
+
+| ปัญหาที่เจอ | สาเหตุ | วิธีแก้ไข |
+|-------------|--------|-----------|
+| `google_fonts 9.x` ทำให้ error `TextTheme` | google_fonts เวอร์ชันใหม่ใช้ TextTheme คนละคลาสกับที่โค้ดอ้างอิง | ล็อกเวอร์ชันไว้ที่ `google_fonts: 8.2.1` ใน `pubspec.yaml` **ห้าม upgrade** |
+| ไม่มีไฟล์หน้าจอ / โครงสร้างกระจัดกระจาย | โปรเจกต์เริ่มต้นมีแค่ `main.dart` ไฟล์เดียว | สร้างโครงสร้างใหม่: `providers/`, `models/`, `screens/`, `widgets/`, `services/` แยกตามหน้าจอ |
+| ไม่มีระบบจัดการสถานะบทบาท | ยังไม่มี provider | เพิ่ม `provider: ^6.1.2` สร้าง `RoleProvider` (student/teacher) และ `AppDatabaseProvider` |
+| ไม่มีข้อมูลสำหรับทดสอบ | ต้องต่อ API จริงก่อนถึงจะเห็นข้อมูล | สร้าง `lib/services/mock_data.dart` ย้ายข้อมูลจาก `index.html` มาใช้เป็น mock data |
+| **`RenderFlex overflowed by 10 pixels on the bottom`** | เนื้อหาใน `SingleChildScrollView` ชนกับแถบนำทางด้านล่าง เนื่องจากใช้ `padding` ค่าคงที่ไม่ครอบคลุม safe area ของมือถือ (เช่น home indicator ของ iPhone) | สร้างฟังก์ชัน `bottomPadding(context)` ที่อ่านจาก `MediaQuery.of(context).padding.bottom` แทนค่าคงที่ แล้วใส่ใน `SingleChildScrollView` และ `ListView.builder` ทุกหน้าจอ |
+| **โครงสร้าง `home_screen.dart` ทำให้ layout พัง** | ใช้ `GridView.count(shrinkWrap: true)` และ `Row(children: [Expanded, Expanded])` ภายใน `Column` ภายใน `SingleChildScrollView` ทำให้ Flutter คำนวณความสูงผิดพลาด | เปลี่ยน `GridView` เป็น `Column` + สอง `Row` (การ์ด 4 ตัวแบ่ง 2 แถว) และเปลี่ยน `Row+Expanded` เป็น `Column` ซ้อนแนวตั้ง |
+| **กดปุ่มนำทางด้านล่างซ้ำๆ ได้หลายครั้ง** | Debounce state ถูกเก็บใน `State` ของ `CustomBottomNav` ซึ่งถูกสร้างใหม่ทุกครั้งที่เปลี่ยน route ทำให้ตัวจับเวลารีเซ็ตตลอด | ย้าย state debounce ไว้เป็น `static` (`_lastRoute`, `_lastTapTime`) จำเวลากดข้ามหน้าได้ เช็กว่ากด route ปัจจุบันซ้ำหรือไม่ก่อนนำทาง หน่วงเวลา 500ms ก่อนอนุญาตให้กด route เดิมอีกครั้ง |
+
 ## หมายเหตุสำคัญ
 
 - **ห้าม `flutter pub upgrade google_fonts`** เด็ดขาด เพราะเวอร์ชัน 9.x จะเกิด error `TextTheme` ซ้ำ ต้องล็อกไว้ที่ `google_fonts: 8.2.1` เท่านั้น
