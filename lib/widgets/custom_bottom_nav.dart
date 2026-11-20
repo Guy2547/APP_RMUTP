@@ -29,18 +29,23 @@ class CustomBottomNav extends StatefulWidget {
 }
 
 class _CustomBottomNavState extends State<CustomBottomNav> {
-  String? _lastTappedRoute;
-  DateTime? _lastTapTime;
+  // --- Static: จำ state ข้ามหน้าได้ แม้ widget จะถูกสร้างใหม่ทุกครั้งที่เปลี่ยน route ---
+  static String? _lastRoute;
+  static DateTime? _lastTapTime;
 
   void _onItemTapped(String route) {
+    // 1. ห้ามกดหน้าเดิมที่อยู่ปัจจุบัน (ไม่ต้องนำทางซ้ำ)
+    if (route == widget.currentRoute) return;
+
     final now = DateTime.now();
-    // กันกดซ้ำเร็วเกินไป (ภายใน 500ms) และกันกด route เดิมซ้ำ
-    if (_lastTappedRoute == route &&
+    // 2. กันกดซ้ำเร็วเกินไป (ภายใน 500ms) สำหรับ route เดียวกัน
+    if (_lastRoute == route &&
         _lastTapTime != null &&
         now.difference(_lastTapTime!) < const Duration(milliseconds: 500)) {
       return;
     }
-    _lastTappedRoute = route;
+
+    _lastRoute = route;
     _lastTapTime = now;
     widget.onTap?.call(route);
   }
