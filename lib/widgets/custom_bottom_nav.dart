@@ -9,7 +9,7 @@ final List<BottomNavItem> kBottomNavItems = [
   BottomNavItem(route: '/profile', label: 'โปรไฟล์', icon: Icons.person),
 ];
 
-class CustomBottomNav extends StatelessWidget {
+class CustomBottomNav extends StatefulWidget {
   final String currentRoute;
   final ValueChanged<String>? onTap;
 
@@ -18,6 +18,23 @@ class CustomBottomNav extends StatelessWidget {
     required this.currentRoute,
     this.onTap,
   });
+
+  @override
+  State<CustomBottomNav> createState() => _CustomBottomNavState();
+}
+
+class _CustomBottomNavState extends State<CustomBottomNav> {
+  bool _isNavigating = false;
+
+  void _onItemTapped(String route) {
+    if (_isNavigating) return;
+    setState(() => _isNavigating = true);
+    widget.onTap?.call(route);
+    // ปลดล็อคหลังจาก 600 มิลลิวินาที เพื่อป้องกันการกดซ้ำเร็วเกินไป
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) setState(() => _isNavigating = false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,10 +47,10 @@ class CustomBottomNav extends StatelessWidget {
         top: false,
         child: Row(
           children: kBottomNavItems.map((item) {
-            final active = currentRoute == item.route;
+            final active = widget.currentRoute == item.route;
             return Expanded(
               child: GestureDetector(
-                onTap: onTap != null ? () => onTap!(item.route) : null,
+                onTap: () => _onItemTapped(item.route),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
@@ -46,7 +63,9 @@ class CustomBottomNav extends StatelessWidget {
                       Icon(
                         item.icon,
                         size: 22,
-                        color: active ? kDark : const Color(0xFF9A93AD),
+                        color: _isNavigating
+                            ? Colors.grey.shade400
+                            : (active ? kDark : const Color(0xFF9A93AD)),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -54,7 +73,9 @@ class CustomBottomNav extends StatelessWidget {
                         style: AppText.kanit(
                           fontSize: 11,
                           fontWeight: active ? FontWeight.w600 : FontWeight.w400,
-                          color: active ? kDark : const Color(0xFF9A93AD),
+                          color: _isNavigating
+                              ? Colors.grey.shade400
+                              : (active ? kDark : const Color(0xFF9A93AD)),
                         ),
                       ),
                       if (active)
@@ -77,3 +98,6 @@ class CustomBottomNav extends StatelessWidget {
     );
   }
 }
+
+/// ความสูงของแถบนำทางด้านล่าง รวมเซฟเอเรีย สำหรับเว้นพื้นที่ล่างของจอ
+const double kBottomNavHeight = 80.0;

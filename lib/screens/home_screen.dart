@@ -4,7 +4,7 @@ import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../services/database_service.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart';
+import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, kBottomNavHeight;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -36,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, kBottomNavHeight + 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

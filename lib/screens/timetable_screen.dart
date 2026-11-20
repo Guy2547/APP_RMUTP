@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart';
+import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, kBottomNavHeight;
 
 class TimetableScreen extends StatefulWidget {
   const TimetableScreen({super.key});
@@ -110,7 +110,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, kBottomNavHeight + 16),
                     itemCount: items.length,
                     itemBuilder: (_, i) {
                       final item = items[i];
