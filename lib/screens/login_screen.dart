@@ -12,8 +12,7 @@ const Color _kOutlineButtonBorder = Color(0xFFD6C6E5);
 const Color _kButtonBorder = Color(0xFF2C2C2C);
 const Color _kOnPrimary = Color(0xFFF5F5F5);
 
-const String _kLogoUrl =
-    'https://api.builder.io/api/v1/image/assets/TEMP/88755b0baee069ebe2ea06c92a627386d75fcbfa?width=380';
+const String _kLogoAsset = 'assets/images/rmutp_logo.png';
 
 // Design frame: 402 x 874. Header is 258 tall, of which 52 is the status bar.
 const double _kHeaderBelowStatusBar = 206;
@@ -180,25 +179,11 @@ class _LoginScreenState extends State<LoginScreen> {
             left: 0,
             right: 0,
             child: Center(
-              child: Image.network(
-                _kLogoUrl,
+              child: Image.asset(
+                _kLogoAsset,
                 width: _kLogoSize,
                 height: _kLogoSize,
                 fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => SizedBox(
-                  width: _kLogoSize,
-                  height: _kLogoSize,
-                  child: Center(
-                    child: Text(
-                      'RMUTP',
-                      style: GoogleFonts.inter(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        color: _kPrimary,
-                      ),
-                    ),
-                  ),
-                ),
               ),
             ),
           ),
@@ -326,7 +311,7 @@ class _LoginScreenState extends State<LoginScreen> {
         SizedBox(
           height: 52,
           child: OutlinedButton(
-            onPressed: () {},
+            onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
             style: OutlinedButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: _kPrimary,

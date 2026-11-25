@@ -7,16 +7,18 @@ import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/timetable_screen.dart';
-import 'screens/courses_screen.dart';
-import 'screens/course_detail_screen.dart';
+import 'screens/exam_schedule_screen.dart';
 import 'screens/grades_screen.dart';
-import 'screens/grade_submit_screen.dart';
+import 'screens/transcript_screen.dart';
 import 'screens/attendance_screen.dart';
-import 'screens/news_screen.dart';
-import 'screens/news_detail_screen.dart';
 import 'screens/notif_screen.dart';
-import 'screens/requests_screen.dart';
 import 'screens/help_screen.dart';
+import 'screens/privacy_screen.dart';
+import 'screens/about_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/change_password_screen.dart';
+import 'screens/language_screen.dart';
+import 'screens/appearance_screen.dart';
 import 'providers/role_provider.dart';
 import 'screens/profile_screen.dart';
 import 'widgets/app_theme.dart';
@@ -51,16 +53,18 @@ class RMUTPApp extends StatelessWidget {
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/home': (context) => const HomeScreen(),
         '/timetable': (context) => const TimetableScreen(),
-        '/courses': (context) => const CoursesScreen(),
-        '/course-detail': (context) => const CourseDetailScreen(),
+        '/exam-schedule': (context) => const ExamScheduleScreen(),
         '/grades': (context) => const GradesScreen(),
-        '/grade-submit': (context) => const GradeSubmitScreen(),
+        '/transcript': (context) => const TranscriptScreen(),
         '/attendance': (context) => const AttendanceScreen(),
-        '/news': (context) => const NewsScreen(),
-        '/news-detail': (context) => const NewsDetailScreen(),
         '/notif': (context) => const NotifScreen(),
-        '/requests': (context) => const RequestsScreen(),
         '/help': (context) => const HelpScreen(),
+        '/privacy': (context) => const PrivacyScreen(),
+        '/about': (context) => const AboutScreen(),
+        '/settings': (context) => const SettingsScreen(),
+        '/change-password': (context) => const ChangePasswordScreen(),
+        '/language': (context) => const LanguageScreen(),
+        '/appearance': (context) => const AppearanceScreen(),
         '/profile': (context) => const ProfileScreen(),
       },
     );
