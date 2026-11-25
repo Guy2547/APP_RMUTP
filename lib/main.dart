@@ -1,3 +1,5 @@
+import 'package:device_preview/device_preview.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -21,9 +23,13 @@ import 'widgets/app_theme.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => RoleProvider(),
-      child: const RMUTPApp(),
+    DevicePreview(
+      enabled: !kReleaseMode,
+      defaultDevice: Devices.ios.iPhone16Pro,
+      builder: (context) => ChangeNotifierProvider(
+        create: (_) => RoleProvider(),
+        child: const RMUTPApp(),
+      ),
     ),
   );
 }
@@ -36,6 +42,8 @@ class RMUTPApp extends StatelessWidget {
     return MaterialApp(
       title: 'RMUTP Campus App',
       debugShowCheckedModeBanner: false,
+      locale: DevicePreview.locale(context),
+      builder: DevicePreview.appBuilder,
       theme: _themeData,
       initialRoute: '/login',
       routes: {
@@ -73,7 +81,8 @@ class RMUTPApp extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           backgroundColor: kDark,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           padding: const EdgeInsets.symmetric(vertical: 13),
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
@@ -81,7 +90,8 @@ class RMUTPApp extends StatelessWidget {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: kBorderLight),
@@ -90,7 +100,8 @@ class RMUTPApp extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: kMid, width: 2),
         ),
-        labelStyle: const TextStyle(color: kDark, fontWeight: FontWeight.w600, fontSize: 14),
+        labelStyle: const TextStyle(
+            color: kDark, fontWeight: FontWeight.w600, fontSize: 14),
       ),
     );
   }
