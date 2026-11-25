@@ -21,6 +21,95 @@ const double _kLogoSize = 190;
 const double _kLogoTop = 2;
 const double _kCaptionTop = 176;
 
+enum _LineIconKind { studentId, lock, eye, eyeOff }
+
+class _LineIcon extends StatelessWidget {
+  const _LineIcon(this.kind);
+
+  final _LineIconKind kind;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+        size: const Size(20, 20),
+        painter: _LineIconPainter(kind),
+      );
+}
+
+class _LineIconPainter extends CustomPainter {
+  const _LineIconPainter(this.kind);
+
+  final _LineIconKind kind;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 20, size.height / 20);
+    final paint = Paint()
+      ..color = _kMuted
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.41667
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    switch (kind) {
+      case _LineIconKind.studentId:
+        canvas.drawRRect(
+          RRect.fromLTRBR(2.5, 3.33333, 17.5, 16.6667, const Radius.circular(2.5)),
+          paint,
+        );
+        canvas.drawCircle(const Offset(7.5, 8.33333), 1.66667, paint);
+        canvas.drawPath(
+          Path()
+            ..moveTo(5, 13.3333)
+            ..cubicTo(5, 10, 10, 10, 10, 13.3333)
+            ..moveTo(12.5, 7.5)
+            ..lineTo(15, 7.5)
+            ..moveTo(12.5, 10.8333)
+            ..lineTo(15, 10.8333),
+          paint,
+        );
+      case _LineIconKind.lock:
+        canvas.drawRRect(
+          RRect.fromLTRBR(4.16667, 8.33331, 15.8333, 17.5, const Radius.circular(2.5)),
+          paint,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(6.66667, 8.33332)
+            ..lineTo(6.66667, 5)
+            ..arcTo(
+              Rect.fromCircle(center: const Offset(10, 5), radius: 3.33333),
+              3.14159265,
+              3.14159265,
+              false,
+            )
+            ..lineTo(13.3333, 8.33332)
+            ..moveTo(10, 11.6667)
+            ..lineTo(10, 14.1667),
+          paint,
+        );
+      case _LineIconKind.eye:
+      case _LineIconKind.eyeOff:
+        canvas.drawPath(
+          Path()
+            ..moveTo(1.66667, 10)
+            ..cubicTo(1.66667, 10, 5, 4.16666, 10, 4.16666)
+            ..cubicTo(15, 4.16666, 18.3333, 10, 18.3333, 10)
+            ..cubicTo(18.3333, 10, 15, 15.8333, 10, 15.8333)
+            ..cubicTo(5, 15.8333, 1.66667, 10, 1.66667, 10)
+            ..close(),
+          paint,
+        );
+        canvas.drawCircle(const Offset(10, 10), 2.5, paint);
+        if (kind == _LineIconKind.eyeOff) {
+          canvas.drawLine(const Offset(3.5, 16.5), const Offset(16.5, 3.5), paint);
+        }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_LineIconPainter old) => old.kind != kind;
+}
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -155,7 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _label('ชื่อผู้ใช้'),
         const SizedBox(height: 7),
         _field(
-          icon: Icons.badge_outlined,
+          icon: const _LineIcon(_LineIconKind.studentId),
           hint: 'รหัสนักศึกษา',
           controller: _usernameCtrl,
           keyboardType: TextInputType.number,
@@ -166,7 +255,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _label('รหัสผ่าน'),
         const SizedBox(height: 7),
         _field(
-          icon: Icons.lock_outline,
+          icon: const _LineIcon(_LineIconKind.lock),
           hint: 'รหัสบัตรประชาชน',
           controller: _passwordCtrl,
           obscure: _obscure,
@@ -177,10 +266,8 @@ class _LoginScreenState extends State<LoginScreen> {
             tooltip: _obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints.tightFor(width: 44, height: 44),
-            icon: Icon(
-              _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-              size: 20,
-              color: _kMuted,
+            icon: _LineIcon(
+              _obscure ? _LineIconKind.eye : _LineIconKind.eyeOff,
             ),
           ),
         ),
@@ -269,7 +356,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
   Widget _field({
-    required IconData icon,
+    required Widget icon,
     required String hint,
     required TextEditingController controller,
     bool obscure = false,
@@ -289,7 +376,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: _kMuted),
+          icon,
           const SizedBox(width: 6),
           Expanded(
             child: TextField(
