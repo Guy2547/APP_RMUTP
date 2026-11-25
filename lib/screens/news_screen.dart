@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart';
 
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});
@@ -216,10 +215,6 @@ class _NewsScreenState extends State<NewsScreen> {
             ],
           ],
         ),
-      ),
-      bottomNavigationBar: CustomBottomNav(
-        currentRoute: '/news',
-        onTap: (route) => Navigator.pushNamed(context, route),
       ),
     );
   }

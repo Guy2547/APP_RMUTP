@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart';
 import '../widgets/grade_card.dart';
 
 class GradeSubmitScreen extends StatefulWidget {
@@ -189,10 +188,6 @@ class _GradeSubmitScreenState extends State<GradeSubmitScreen> {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: CustomBottomNav(
-        currentRoute: '/courses',
-        onTap: (route) => Navigator.pushNamed(context, route),
       ),
     );
   }

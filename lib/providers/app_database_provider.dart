@@ -203,6 +203,12 @@ class AppDatabaseProvider extends ChangeNotifier {
     required String subjectCode,
     required bool submitFinal,
   }) async {
+    final tchId = currentUser.teacherId;
+    if (tchId == null) {
+      lastError = 'เฉพาะอาจารย์ที่ล็อกอินเท่านั้นที่ส่งเกรดได้';
+      notifyListeners();
+      return;
+    }
     if (submitFinal) {
       for (final row in teacherGradeRows) {
         row.status = 'ส่งแล้ว';
@@ -213,7 +219,7 @@ class AppDatabaseProvider extends ChangeNotifier {
       subjectCode,
       teacherGradeRows,
       submitFinal: submitFinal,
-      teacherId: currentUser.teacherId ?? 'T-1024',
+      teacherId: tchId,
     );
   }
 

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
-import '../services/database_config.dart';
 import '../widgets/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -13,8 +12,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailCtrl = TextEditingController(text: 's650602001@rmutp.ac.th');
-  final _passCtrl = TextEditingController(text: 'password123');
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
   bool _obscure = true;
 
   Future<void> _handleSignIn() async {
@@ -49,254 +48,202 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.pushNamed(context, '/home');
   }
 
-  void _openDatabaseSettingsDialog() {
-    final dbProvider = context.read<AppDatabaseProvider>();
-    final supaUrlCtrl = TextEditingController(
-      text: DatabaseConfig.customSupabaseUrl,
-    );
-    final supaKeyCtrl = TextEditingController(
-      text: DatabaseConfig.customSupabaseAnonKey,
-    );
-    final uniUrlCtrl = TextEditingController(
-      text: DatabaseConfig.customUniversityApiUrl,
-    );
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          '⚙️ ตั้งค่าการเชื่อมต่อฐานข้อมูล',
-          style: AppText.kanit(fontSize: 16, fontWeight: FontWeight.bold, color: kDark),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'ระบบที่ 1: Supabase Cloud API',
-                style: AppText.kanit(fontSize: 12, fontWeight: FontWeight.w600, color: kMid),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: supaUrlCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Supabase Project URL',
-                  hintText: 'https://xxxx.supabase.co',
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: supaKeyCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Supabase Anon Key',
-                  hintText: 'eyJhbGciOiJIUzI1NiIs...',
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'ระบบที่ 2: University SQL Server (Express API)',
-                style: AppText.kanit(fontSize: 12, fontWeight: FontWeight.w600, color: kMid),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: uniUrlCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'University Express API URL',
-                  hintText: 'http://localhost:4000/api',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('ยกเลิก'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await dbProvider.updateConnectionConfig(
-                supabaseUrl: supaUrlCtrl.text,
-                supabaseAnonKey: supaKeyCtrl.text,
-                universityApiUrl: uniUrlCtrl.text,
-              );
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('บันทึก'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final dbProvider = context.watch<AppDatabaseProvider>();
-    final isSupaMode =
-        dbProvider.backendMode == DatabaseBackendMode.supabaseCloud;
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: const Color(0xFFF5F3FA),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             children: [
-              const SizedBox(height: 20),
-              Image.network(
-                'https://www.rmutp.ac.th/web2561/wp-content/uploads/2018/06/rmutp-logo.png',
-                height: 64,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 64,
-                  width: 64,
-                  decoration: BoxDecoration(
-                    color: kDark,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(Icons.school, color: Colors.white, size: 32),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'ยินดีต้อนรับสู่ RMUTP',
-                style: AppText.kanit(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: kDark,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Rajamangala University of Technology Phra Nakhon',
-                style: AppText.kanit(fontSize: 12, color: Colors.grey.shade500),
-              ),
-              const SizedBox(height: 18),
-
-              // แถบสลับโหมดฐานข้อมูล 2 ระบบ
-              AppCard(
-                padding: const EdgeInsets.all(10),
-                color: Colors.white,
+              // โลโก้ RMUTP + หัวข้อ (อยู่กลางด้านบน)
+              Center(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '🗄️ ระบบฐานข้อมูล: ${dbProvider.backendModeLabel}',
-                          style: AppText.kanit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: kDark,
+                    const SizedBox(height: 20),
+                    Image.asset(
+                      'lib/assets/images/rmutp_logo.jpg',
+                      height: 56,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 56,
+                        width: 56,
+                        decoration: BoxDecoration(
+                          color: kDark,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'RMUTP',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                            ),
                           ),
                         ),
-                        InkWell(
-                          onTap: _openDatabaseSettingsDialog,
-                          child: const Icon(Icons.settings, size: 16, color: kMid),
-                        ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _modeButton(
-                            label: '☁️ Supabase Cloud',
-                            selected: isSupaMode,
-                            onTap: () => dbProvider.setBackendMode(
-                              DatabaseBackendMode.supabaseCloud,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _modeButton(
-                            label: '🏛️ University SQL',
-                            selected: !isSupaMode,
-                            onTap: () => dbProvider.setBackendMode(
-                              DatabaseBackendMode.universitySqlServer,
-                            ),
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'STUDENT PORTAL',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey,
+                        letterSpacing: 1.2,
+                      ),
                     ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Log in',
+                      style: TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        color: kDark,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'เข้าสู่มหาวิทยาลัยเทคโนโลยีราชมงคลพระนคร RMUTP',
+                      style: AppText.kanit(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
 
+              // อีเมล
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'อีเมล',
+                  style: AppText.kanit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
               TextField(
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  labelText: 'อีเมลมหาวิทยาลัย (@rmutp.ac.th)',
-                  prefixIcon: const Icon(Icons.alternate_email, size: 18, color: kMid),
+                  hintText: 's650602xxx@rmutp.ac.th',
+                  prefixIcon: const Icon(Icons.email_outlined, color: kMid, size: 22),
                   filled: true,
                   fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: kBorderLight),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: kMid, width: 2),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: kDark, width: 2),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _passCtrl,
-                obscureText: _obscure,
-                decoration: InputDecoration(
-                  labelText: 'รหัสผ่าน',
-                  prefixIcon: const Icon(Icons.lock_outline, size: 18, color: kMid),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscure ? Icons.visibility_off : Icons.visibility,
-                      color: kMid,
-                    ),
-                    onPressed: () => setState(() => _obscure = !_obscure),
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: kBorderLight),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: kMid, width: 2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 24),
+
+              // รหัสผ่าน
               Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
-                  child: const Text(
-                    'ลืมรหัสผ่าน?',
-                    style: TextStyle(color: kMid, fontSize: 12),
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'รหัสผ่าน',
+                  style: AppText.kanit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade700,
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+              Stack(
+                children: [
+                  TextField(
+                    controller: _passCtrl,
+                    obscureText: _obscure,
+                    decoration: InputDecoration(
+                      hintText: 'กรุณากรอกรหัสผ่าน',
+                      prefixIcon: const Icon(Icons.lock_outline, color: kMid, size: 22),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: kMid,
+                          size: 22,
+                        ),
+                        onPressed: () => setState(() => _obscure = !_obscure),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: kDark, width: 2),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    right: 20,
+                    top: 0,
+                    bottom: 0,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
+                        child: Text(
+                          'ลืมรหัสผ่าน?',
+                          style: AppText.kanit(
+                            fontSize: 12,
+                            color: kMid,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              // ปุ่มเข้าสู่ระบบ
               SizedBox(
                 width: double.infinity,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: dbProvider.isLoading ? null : _handleSignIn,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kDark,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
                   ),
                   child: dbProvider.isLoading
                       ? const SizedBox(
-                          height: 18,
-                          width: 18,
+                          height: 22,
+                          width: 22,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             color: Colors.white,
@@ -305,67 +252,51 @@ class _LoginScreenState extends State<LoginScreen> {
                       : Text(
                           'เข้าสู่ระบบ',
                           style: AppText.kanit(
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
                           ),
                         ),
                 ),
               ),
-              const SizedBox(height: 16),
-              AppCard(
-                padding: const EdgeInsets.all(12),
-                color: Colors.grey.shade50,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '📋 บัญชีทดสอบ (รหัสผ่าน: password123):',
+              const SizedBox(height: 32),
+
+              // ลืมรหัสผ่าน + เข้าสู่บัญชี RMUTP (แถวเดียว)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'ลืมรหัสผ่าน? ',
+                    style: AppText.kanit(
+                      fontSize: 13,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
+                    child: Text(
+                      'เข้าสู่บัญชี RMUTP',
                       style: AppText.kanit(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
                         color: kDark,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '• นักศึกษา: s650602001@rmutp.ac.th (น.ส.มินตรา ใจดี)\n'
-                      '• นักศึกษา: s650602002@rmutp.ac.th (นายภูริ พัฒนากุล)\n'
-                      '• อาจารย์: surachai.w@rmutp.ac.th (อ.สุรชัย วงศ์ใหญ่)',
-                      style: AppText.kanit(fontSize: 11, color: Colors.grey.shade700),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+
+              // ข้อความล่าง
+              Text(
+                'ไม่มีบัญชีผู้ใช้งานในระบบของมหาวิทยาลัย',
+                style: AppText.kanit(
+                  fontSize: 11,
+                  color: Colors.grey.shade500,
                 ),
               ),
+              const SizedBox(height: 20),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _modeButton({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-        decoration: BoxDecoration(
-          color: selected ? kDark : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? kDark : kBorderLight),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: AppText.kanit(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: selected ? Colors.white : Colors.grey.shade700,
-            ),
           ),
         ),
       ),

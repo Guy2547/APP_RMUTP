@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
-import '../services/database_service.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, bottomPadding;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,8 +23,10 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('RMUTP STUDENT PORTAL',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'RMUTP STUDENT PORTAL',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         actions: [
           IconButton(
@@ -36,11 +36,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding(context)),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Profile header (purple card)
+            // ==================== Purple Header Card ====================
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -106,7 +106,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: _statChip(
                           label: 'หน่วยกิต',
-                          value: '${user.earnedCredits}/${user.totalCreditsRequired}',
+                          value:
+                              '${user.earnedCredits}/${user.totalCreditsRequired}',
                           color: kGold.withValues(alpha: 0.9),
                         ),
                       ),
@@ -115,25 +116,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
 
-            // Quick stats grid — ใช้ Column+Row แทน GridView เพื่อหลีกเลี่ยง overflow
-            _buildStatsGrid(db, isTeacher, user),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-            // Current class card — Stack แนวตั้งแทน Row+Expanded
-            _buildCurrentClassCard(context, db, isTeacher),
-            const SizedBox(height: 20),
+            // ==================== Menu Grid (3 columns x 2 rows) ====================
+            _buildMenuGrid(isTeacher),
 
-            // Timetable for today
-            _buildTodaysTimetable(db, isTeacher),
+            const SizedBox(height: 24),
+
+            // ==================== Notifications Section ====================
+            _buildNotifications(db),
           ],
         ),
       ),
-      bottomNavigationBar: CustomBottomNav(
-        currentRoute: '/home',
-        onTap: (route) => Navigator.pushNamed(context, route),
-      ),
+      // แถบนำทางด้านล่างถูกลบออกแล้วตามที่ร้องขอ
     );
   }
 
@@ -173,294 +169,116 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatsGrid(AppDatabaseProvider db, bool isTeacher,
-      AuthenticatedUserSession user) {
-    final pendingHw = db.studentTimetable.fold<int>(
-      0,
-      (sum, item) => sum + item.pendingAssignments,
-    );
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _statCard(
-                title: isTeacher ? 'วิชาที่สอน' : 'GPA เทอมนี้',
-                value: isTeacher
-                    ? '${db.teacherTimetable.length}'
-                    : user.currentTermGpa.toStringAsFixed(2),
-                icon: Icons.analytics,
-                color: kDark,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _statCard(
-                title: isTeacher ? 'นศ.ในห้องวันนี้' : 'เข้าเรียน',
-                value: isTeacher
-                    ? '${db.attendanceRecords.length} คน'
-                    : '${db.presentAttendanceCount}/${db.attendanceRecords.length}',
-                icon: Icons.check_circle,
-                color: kGold,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _statCard(
-                title: isTeacher ? 'รอส่งเกรด' : 'งานค้างส่ง',
-                value: isTeacher
-                    ? '${db.teacherGradeRows.where((r) => r.status != 'ส่งแล้ว').length}'
-                    : '$pendingHw',
-                icon: Icons.assignment_late,
-                color: Colors.orange.shade700,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _statCard(
-                title: 'ทุน / กิจกรรม',
-                value: '3 รายการ',
-                icon: Icons.card_membership,
-                color: kMid,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _statCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
-    return AppCard(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: AppText.kanit(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: kDark,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: AppText.kanit(
-              fontSize: 11,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+  // -------------------- กริดเมนู 3 คอลัมน์ × 2 แถว --------------------
+  Widget _buildMenuGrid(bool isTeacher) {
+    final List<MenuItem> menus = [
+      MenuItem(
+        icon: Icons.schedule,
+        label: 'ตารางเรียน',
+        route: '/timetable',
+        color: kDark,
       ),
-    );
-  }
-
-  Widget _buildCurrentClassCard(
-    BuildContext context,
-    AppDatabaseProvider db,
-    bool isTeacher,
-  ) {
-    final firstSub = isTeacher
-        ? (db.teacherTimetable.isNotEmpty ? db.teacherTimetable.first : null)
-        : (db.studentTimetable.isNotEmpty ? db.studentTimetable.first : null);
+      MenuItem(
+        icon: Icons.grade,
+        label: 'เกรด',
+        route: '/grades',
+        color: kGold,
+      ),
+      MenuItem(
+        icon: Icons.payment,
+        label: 'การเงิน',
+        route: '/profile',
+        color: kMid,
+      ),
+      MenuItem(
+        icon: Icons.article,
+        label: 'ข่าวสาร',
+        route: '/news',
+        color: Colors.blue.shade700,
+      ),
+      MenuItem(
+        icon: Icons.description,
+        label: 'คำร้อง',
+        route: '/requests',
+        color: Colors.green.shade700,
+      ),
+      MenuItem(
+        icon: Icons.person,
+        label: 'โปรไฟล์',
+        route: '/profile',
+        color: Colors.purple.shade700,
+      ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Card ปัจจุบัน
-        AppCard(
-          color: Colors.white,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    isTeacher ? '👩‍🏫 กำลังสอนตอนนี้' : '⏰ กำลังเรียนตอนนี้',
-                    style: AppText.kanit(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: kDark,
-                    ),
-                  ),
-                  if (firstSub != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        firstSub.status,
-                        style: AppText.kanit(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green.shade700,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (firstSub != null) ...[
-                Text(
-                  firstSub.displayName,
-                  style: AppText.kanit(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: kDark,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${firstSub.time} • ${firstSub.room} • ${firstSub.teacher}',
-                  style: AppText.kanit(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ] else ...[
-                Text(
-                  'ENGCE302 — ระบบฐานข้อมูล (Sec.1)',
-                  style: AppText.kanit(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: kDark,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '09:00–12:00 • ห้อง 1604 • อ.สุรชัย',
-                  style: AppText.kanit(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 36,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pushNamed(context, '/attendance'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isTeacher ? kGold : kDark,
-                    foregroundColor: isTeacher ? kDark : Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    isTeacher ? 'เปิดห้องเช็คชื่อ' : 'เช็คชื่อ / สแกน QR',
-                    style: AppText.kanit(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+        Text(
+          'เมนูลัด',
+          style: AppText.kanit(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: kDark,
           ),
         ),
         const SizedBox(height: 12),
-        // Card แจ้งเตือน (แนวตั้งแทน Row+Expanded)
-        AppCard(
-          color: Colors.white,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'แจ้งเตือนล่าสุด',
-                style: AppText.kanit(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: kDark,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ...db.notifications.take(3).map((n) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: n.accentColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              n.title,
-                              style: AppText.kanit(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: kDark,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              n.subtitle,
-                              style: AppText.kanit(
-                                fontSize: 10,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            childAspectRatio: 0.85,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
           ),
+          itemCount: menus.length,
+          itemBuilder: (context, index) {
+            final menu = menus[index];
+            return _menuCard(menu);
+          },
         ),
       ],
     );
   }
 
-  Widget _buildTodaysTimetable(AppDatabaseProvider db, bool isTeacher) {
-    final items = isTeacher ? db.teacherTimetable : db.studentTimetable;
+  Widget _menuCard(MenuItem menu) {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, menu.route),
+      child: AppCard(
+        color: Colors.white,
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: menu.color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(menu.icon, color: menu.color, size: 24),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              menu.label,
+              style: AppText.kanit(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: kDark,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // -------------------- ส่วนแจ้งเตือน --------------------
+  Widget _buildNotifications(AppDatabaseProvider db) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -468,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'ตารางเรียนประจำวัน',
+              'แจ้งเตือน',
               style: AppText.kanit(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -476,7 +294,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             TextButton(
-              onPressed: () => Navigator.pushNamed(context, '/timetable'),
+              onPressed: () => Navigator.pushNamed(context, '/notif'),
               child: Text(
                 'ดูทั้งหมด',
                 style: AppText.kanit(
@@ -489,111 +307,71 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        if (items.isEmpty)
-          AppCard(
-            color: Colors.white,
-            padding: const EdgeInsets.all(20),
-            child: Center(
-              child: Column(
+        ...db.notifications.take(3).map((n) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: AppCard(
+              color: Colors.white,
+              padding: const EdgeInsets.all(14),
+              child: Row(
                 children: [
-                  Icon(
-                    Icons.event_busy,
-                    size: 48,
-                    color: Colors.grey.shade300,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'ไม่มีวิชาในวันนี้',
-                    style: AppText.kanit(
-                      fontSize: 14,
-                      color: Colors.grey.shade500,
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: n.accentColor,
+                      shape: BoxShape.circle,
                     ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          n.title,
+                          style: AppText.kanit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: kDark,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          n.subtitle,
+                          style: AppText.kanit(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: kBorderLight,
+                    size: 20,
                   ),
                 ],
               ),
             ),
-          )
-        else
-          ...items.take(3).map((item) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: AppCard(
-                color: Colors.white,
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: kDark.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          item.time.split('–').first,
-                          style: AppText.kanit(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: kDark,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.displayName,
-                            style: AppText.kanit(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: kDark,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${item.room} • ${item.teacher}',
-                            style: AppText.kanit(
-                              fontSize: 11,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (item.progress > 0)
-                      SizedBox(
-                        width: 60,
-                        height: 60,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            CircularProgressIndicator(
-                              value: item.progress / 100,
-                              strokeWidth: 6,
-                              backgroundColor: Colors.grey.shade200,
-                              valueColor: AlwaysStoppedAnimation<Color>(kMid),
-                            ),
-                            Text(
-                              '${item.progress}%',
-                              style: AppText.kanit(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: kDark,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            );
-          }),
+          );
+        }),
       ],
     );
   }
+}
+
+class MenuItem {
+  final IconData icon;
+  final String label;
+  final String route;
+  final Color color;
+
+  MenuItem({
+    required this.icon,
+    required this.label,
+    required this.route,
+    required this.color,
+  });
 }

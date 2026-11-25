@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart';
 
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key});
@@ -68,10 +67,6 @@ class HelpScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: CustomBottomNav(
-        currentRoute: '/help',
-        onTap: (route) => Navigator.pushNamed(context, route),
       ),
     );
   }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, bottomPadding;
+import '../widgets/custom_bottom_nav.dart' show bottomPadding;
 
 class GradesScreen extends StatefulWidget {
   const GradesScreen({super.key});
@@ -272,10 +272,6 @@ class _GradesScreenState extends State<GradesScreen> {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: CustomBottomNav(
-        currentRoute: '/grades',
-        onTap: (route) => Navigator.pushNamed(context, route),
       ),
     );
   }

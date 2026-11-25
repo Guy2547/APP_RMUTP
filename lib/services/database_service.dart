@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 import '../models/grade.dart';
 import '../models/news_item.dart';
@@ -158,6 +161,41 @@ class DatabaseService {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   };
 
+  /// Secure Storage สำหรับเก็บ Access Token แบบเข้ารหัส (Keystore / Keychain)
+  static final FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  static const String _tokenKey = 'supabase_access_token';
+
+  /// Dio client พร้อมโครงสร้าง Certificate Pinning
+  /// หมายเหตุ: ต้องนำข้อมูล pin ของ SSL certificate จากเซิร์ฟเวอร์จริงมาใส่ใน _certPins
+  // ignore: unused_field
+  static final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 6),
+    receiveTimeout: const Duration(seconds: 6),
+    sendTimeout: const Duration(seconds: 6),
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+  ));
+
+  // TODO: ใส่ SHA-256 fingerprint ของ SSL certificate ของ Supabase / University API ที่นี่
+  // ตัวอย่าง: 'SHA-256=xx:xx:xx:...'
+  // ต้องขอข้อมูล pin จากผู้ดูแลระบบเซิร์ฟเวอร์ก่อนจึงจะใช้งานจริงได้
+  // ignore: unused_field
+  static const List<String> _certPins = [];
+
+  /// สร้าง UUID แบบสุ่ม (เวอร์ชัน 4) ใช้แทน ID ที่เดาได้
+  static String _generateUuid() {
+    final random = Random.secure();
+    return List.generate(36, (i) {
+      if (i == 8 || i == 13 || i == 18 || i == 23) return '-';
+      if (i == 14) return '4';
+      if (i == 19) return '89ab'[random.nextInt(4)];
+      return '0123456789abcdef'[random.nextInt(16)];
+    }).join();
+  }
+
   /// ปกปิดเลขบัตรประชาชนตามหลัก PDPA: 1-xxxx-xxxxx-xx-x
   static String maskCitizenId(String? rawCid) {
     final clean = (rawCid ?? '').trim();
@@ -166,8 +204,9 @@ class DatabaseService {
     return '${clean[0]}-xxxx-xxxxx-${clean.substring(10, 12)}-${clean[12]}';
   }
 
-  /// ล้าง Session Token เมื่อผู้ใช้ออกจากระบบ
-  static void clearSession() {
+  /// ล้าง Session Token เมื่อผู้ใช้ออกจากระบบ (ทั้งหน่วยความจำและ Secure Storage)
+  static Future<void> clearSession() async {
+    await _storage.delete(key: _tokenKey);
     DatabaseConfig.activeAccessToken = null;
   }
 
@@ -187,7 +226,7 @@ class DatabaseService {
     String password,
   ) async {
     final cleanEmail = email.trim().toLowerCase();
-    clearSession();
+    await clearSession();
 
     if (canCallRemoteApi) {
       try {
@@ -215,6 +254,7 @@ class DatabaseService {
               row['access_token']?.toString() ?? row['session_token']?.toString();
           if (token != null && token.isNotEmpty) {
             DatabaseConfig.activeAccessToken = token;
+            await _storage.write(key: _tokenKey, value: token);
           }
 
           return AuthenticatedUserSession(
@@ -244,8 +284,8 @@ class DatabaseService {
       }
     }
 
-    if (password != 'password123') return null;
-    return _localAccounts[cleanEmail];
+    // ไม่มี fallback รหัสผ่าน hardcoded อีกต่อไป — ต้องยืนยันตัวตนผ่าน API จริงเท่านั้น
+    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -510,7 +550,7 @@ class DatabaseService {
     String subjectCode,
     List<StudentRow> rows, {
     required bool submitFinal,
-    String teacherId = 'T-1024',
+    required String teacherId, // ต้องระบุจาก session ของอาจารย์ที่ล็อกอินจริง ไม่มีค่าเริ่มต้น hardcoded
   }) async {
     // Client-side Input Validation ก่อนส่ง
     for (final row in rows) {
@@ -563,12 +603,13 @@ class DatabaseService {
   // ---------------------------------------------------------------------------
   static Future<bool> checkInAttendance({
     required String studentId,
-    String? checkInTime, // ไม่ส่งขึ้น Server (Server ใช้ NOW() เสมอเพื่อกันโกงเวลา)
-    String sessionId = '77777777-7777-7777-7777-777777777701',
+    String? checkInTime,
+    String? sessionId, // สร้าง UUID สุ่มถ้าไม่ส่งมา
     String method = 'qr_scan',
   }) async {
     if (!canCallRemoteApi) return true;
     try {
+      final effectiveSessionId = sessionId ?? _generateUuid();
       final uri = Uri.parse(
         '${DatabaseConfig.activeRestBaseUrl}/rpc/sp_check_in_attendance',
       );
@@ -577,7 +618,7 @@ class DatabaseService {
             uri,
             headers: DatabaseConfig.defaultHeaders,
             body: jsonEncode({
-              'p_session_id': sessionId,
+              'p_session_id': effectiveSessionId,
               'p_student_id': studentId,
               'p_method': method,
             }),
@@ -589,11 +630,12 @@ class DatabaseService {
     }
   }
 
-  static Future<bool> toggleAttendanceSession(bool isOpen) async {
+  static Future<bool> toggleAttendanceSession(bool isOpen, {String? sessionId}) async {
     if (!canCallRemoteApi) return true;
     try {
+      final effectiveSessionId = sessionId ?? _generateUuid();
       final uri = Uri.parse(
-        '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.tableAttendanceSessions}?id=eq.77777777-7777-7777-7777-777777777701',
+        '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.tableAttendanceSessions}?id=eq.$effectiveSessionId',
       );
       final res = await http
           .patch(
@@ -632,7 +674,7 @@ class DatabaseService {
     required String fileName,
     int fileSizeBytes = 256000,
     String mimeType = 'application/pdf',
-    String assignmentId = '66666666-6666-6666-6666-666666666601',
+    String? assignmentId, // สร้าง UUID สุ่มถ้าไม่ส่งมา
   }) async {
     if (!isValidUploadFile(
       fileName,
@@ -643,6 +685,7 @@ class DatabaseService {
     }
     if (!canCallRemoteApi) return true;
     try {
+      final effectiveAssignmentId = assignmentId ?? _generateUuid();
       final uri = Uri.parse(
         '${DatabaseConfig.activeRestBaseUrl}/rpc/sp_submit_assignment',
       );
@@ -651,7 +694,7 @@ class DatabaseService {
             uri,
             headers: DatabaseConfig.defaultHeaders,
             body: jsonEncode({
-              'p_assignment_id': assignmentId,
+              'p_assignment_id': effectiveAssignmentId,
               'p_student_id': studentId,
               'p_original_filename': fileName.trim(),
               'p_file_size_bytes': fileSizeBytes,
@@ -710,7 +753,7 @@ class DatabaseService {
     required String title,
     required String description,
   }) async {
-    final code = '#RQ-${1046 + DateTime.now().second}';
+    final code = '#RQ-${_generateUuid().substring(0, 8).toUpperCase()}';
     final newItem = RequestItem(
       id: code,
       title: title,
@@ -860,170 +903,39 @@ class DatabaseService {
   }
 
   // ---------------------------------------------------------------------------
-  // ข้อมูลบัญชีจริงในฐานข้อมูลสำหรับการตรวจสอบเมื่อยังไม่ได้ต่ออินเทอร์เน็ต
+  // Fallback data เมื่อไม่มีการเชื่อมต่อ API (dummy data เท่านั้น — ไม่มีข้อมูลบุคคลจริง)
   // ---------------------------------------------------------------------------
-  static final Map<String, AuthenticatedUserSession> _localAccounts = {
-    's650602001@rmutp.ac.th': AuthenticatedUserSession(
-      email: 's650602001@rmutp.ac.th',
-      role: 'student',
-      studentId: '650602001',
-      displayName: 'น.ส.มินตรา ใจดี',
-      subtitleInfo: '650602001 • วิศวกรรมคอมพิวเตอร์ ปี 2',
-      gpax: 3.42,
-      currentTermGpa: 3.55,
-      earnedCredits: 87,
-      totalCreditsRequired: 132,
-    ),
-    's650602002@rmutp.ac.th': AuthenticatedUserSession(
-      email: 's650602002@rmutp.ac.th',
-      role: 'student',
-      studentId: '650602002',
-      displayName: 'นายภูริ พัฒนากุล',
-      subtitleInfo: '650602002 • วิศวกรรมคอมพิวเตอร์ ปี 2',
-      gpax: 3.15,
-      currentTermGpa: 3.20,
-      earnedCredits: 87,
-      totalCreditsRequired: 132,
-    ),
-    's650602003@rmutp.ac.th': AuthenticatedUserSession(
-      email: 's650602003@rmutp.ac.th',
-      role: 'student',
-      studentId: '650602003',
-      displayName: 'น.ส.กันยา รัตนโชติ',
-      subtitleInfo: '650602003 • วิศวกรรมคอมพิวเตอร์ ปี 2',
-      gpax: 2.65,
-      currentTermGpa: 2.75,
-      earnedCredits: 84,
-      totalCreditsRequired: 132,
-    ),
-    'surachai.w@rmutp.ac.th': AuthenticatedUserSession(
-      email: 'surachai.w@rmutp.ac.th',
-      role: 'teacher',
-      teacherId: 'T-1024',
-      displayName: 'อ.สุรชัย วงศ์ใหญ่',
-      subtitleInfo: 'T-1024 • ภาควิชาวิศวกรรมคอมพิวเตอร์',
-    ),
-    'naphat.c@rmutp.ac.th': AuthenticatedUserSession(
-      email: 'naphat.c@rmutp.ac.th',
-      role: 'teacher',
-      teacherId: 'T-1025',
-      displayName: 'ผศ.นภัส เจริญผล',
-      subtitleInfo: 'T-1025 • ภาควิชาวิศวกรรมคอมพิวเตอร์',
-    ),
-  };
-
   static StudentDeepProfile _defaultDeepProfile(String studentId) {
-    if (studentId == '650602002') {
-      return StudentDeepProfile(
-        studentId: '650602002',
-        fullNameTh: 'นายภูริ พัฒนากุล',
-        fullNameEn: 'Phuri Phattanakul',
-        universityEmail: 's650602002@rmutp.ac.th',
-        citizenId: maskCitizenId('1100501234502'),
-        birthDate: '2004-08-21',
-        bloodGroup: 'A',
-        facultyNameTh: 'คณะวิศวกรรมศาสตร์',
-        campus: 'ศูนย์พระนครเหนือ',
-        departmentNameTh: 'วิศวกรรมคอมพิวเตอร์',
-        degreeNameTh: 'วิศวกรรมศาสตรบัณฑิต (วศ.บ.)',
-        yearLevel: 2,
-        gpax: 3.15,
-        currentTermGpa: 3.20,
-        creditsProgressLabel: '87/132',
-        advisorName: 'อ.สุรชัย วงศ์ใหญ่',
-        phone: '095-111-2233',
-        lineId: 'phuri_ce65',
-        currentAddress: 'คอนโดเดอะทรี อินเตอร์เชนจ์ ชั้น 12',
-        permanentAddress: '45/8 ถ.ประชาราษฎร์สาย 1 บางซื่อ กรุงเทพมหานคร 10800',
-        emergencyContactName: 'นายวิชัย พัฒนากุล',
-        emergencyContactRelation: 'บิดา',
-        emergencyContactPhone: '086-555-4433',
-      );
-    }
     return StudentDeepProfile(
-      studentId: '650602001',
-      fullNameTh: 'น.ส.มินตรา ใจดี',
-      fullNameEn: 'Mintra Jaidee',
-      universityEmail: 's650602001@rmutp.ac.th',
-      citizenId: maskCitizenId('1100501234501'),
-      birthDate: '2004-05-14',
-      bloodGroup: 'O',
-      facultyNameTh: 'คณะวิศวกรรมศาสตร์',
-      campus: 'ศูนย์พระนครเหนือ',
-      departmentNameTh: 'วิศวกรรมคอมพิวเตอร์',
-      degreeNameTh: 'วิศวกรรมศาสตรบัณฑิต (วศ.บ.)',
-      yearLevel: 2,
-      gpax: 3.42,
-      currentTermGpa: 3.55,
-      creditsProgressLabel: '87/132',
-      advisorName: 'อ.สุรชัย วงศ์ใหญ่',
-      phone: '092-345-6789',
-      lineId: 'mintra_ce65',
-      currentAddress: 'หอพักนักศึกษาเคียงมอ ห้อง 402 ซ.วงศ์สว่าง 11',
-      permanentAddress:
-          '99/12 หมู่ 4 ถ.พิบูลสงคราม วงศ์สว่าง บางซื่อ กรุงเทพมหานคร 10800',
-      emergencyContactName: 'นางสมศรี ใจดี',
-      emergencyContactRelation: 'มารดา',
-      emergencyContactPhone: '081-999-8877',
+      studentId: studentId,
+      fullNameTh: 'ผู้ใช้งานระบบ',
+      fullNameEn: 'System User',
+      universityEmail: '$studentId@example.ac.th',
+      citizenId: 'x-xxxx-xxxxx-xx-x',
+      birthDate: '-',
+      bloodGroup: '-',
+      facultyNameTh: '-',
+      campus: '-',
+      departmentNameTh: '-',
+      degreeNameTh: '-',
+      yearLevel: 1,
+      gpax: 0.0,
+      currentTermGpa: 0.0,
+      creditsProgressLabel: '0/0',
+      advisorName: '-',
+      phone: '-',
+      lineId: '-',
+      currentAddress: '-',
+      permanentAddress: '-',
+      emergencyContactName: '-',
+      emergencyContactRelation: '-',
+      emergencyContactPhone: '-',
     );
   }
 
   static List<FinancialReceiptRecord> _defaultFinancialRecords(
     String studentId,
   ) {
-    if (studentId == '650602002') {
-      return [
-        FinancialReceiptRecord(
-          invoiceNo: 'INV-2569-1-650602002',
-          termLabel: '1/2569',
-          tuitionFee: 15000,
-          universityFee: 2000,
-          labEquipmentFee: 1500,
-          scholarshipDiscount: 0,
-          totalAmount: 18500,
-          dueDate: '2026-06-30',
-          paymentStatus: 'paid',
-          receiptNo: 'RCP-2569-00945',
-          bankName: 'ธนาคารไทยพาณิชย์ (SCB)',
-          transactionRef: 'SCB2026062211053310',
-          paidAt: '22 มิ.ย. 2569 • 11:05 น.',
-          receiptPdfUrl: '/storage/v1/object/authenticated/receipts/RCP-2569-00945.pdf',
-        ),
-      ];
-    }
-    return [
-      FinancialReceiptRecord(
-        invoiceNo: 'INV-2569-1-650602001',
-        termLabel: '1/2569',
-        tuitionFee: 15000,
-        universityFee: 2000,
-        labEquipmentFee: 1500,
-        scholarshipDiscount: 0,
-        totalAmount: 18500,
-        dueDate: '2026-06-30',
-        paymentStatus: 'paid',
-        receiptNo: 'RCP-2569-00891',
-        bankName: 'ธนาคารกรุงไทย (KTB)',
-        transactionRef: 'KTB2026062009154421',
-        paidAt: '20 มิ.ย. 2569 • 09:15 น.',
-        receiptPdfUrl: '/storage/v1/object/authenticated/receipts/RCP-2569-00891.pdf',
-      ),
-      FinancialReceiptRecord(
-        invoiceNo: 'INV-2568-2-650602001',
-        termLabel: '2/2568',
-        tuitionFee: 15000,
-        universityFee: 2000,
-        labEquipmentFee: 1500,
-        scholarshipDiscount: 5000,
-        totalAmount: 13500,
-        dueDate: '2025-11-30',
-        paymentStatus: 'paid',
-        receiptNo: 'RCP-2568-04512',
-        bankName: 'ธนาคารกสิกรไทย (KBANK)',
-        transactionRef: 'KBANK2025111814221099',
-        paidAt: '18 พ.ย. 2568 • 14:22 น.',
-        receiptPdfUrl: '/storage/v1/object/authenticated/receipts/RCP-2568-04512.pdf',
-      ),
-    ];
+    return [];
   }
 }

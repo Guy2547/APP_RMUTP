@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, bottomPadding;
+import '../widgets/custom_bottom_nav.dart' show bottomPadding;
 
 class NewsDetailScreen extends StatelessWidget {
   const NewsDetailScreen({super.key});
@@ -98,10 +98,6 @@ class NewsDetailScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: CustomBottomNav(
-        currentRoute: '/news',
-        onTap: (route) => Navigator.pushNamed(context, route),
       ),
     );
   }

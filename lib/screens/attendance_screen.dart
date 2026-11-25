@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart';
 
 class AttendanceScreen extends StatelessWidget {
   const AttendanceScreen({super.key});
@@ -236,10 +235,6 @@ class AttendanceScreen extends StatelessWidget {
             ],
           ],
         ),
-      ),
-      bottomNavigationBar: CustomBottomNav(
-        currentRoute: '/attendance',
-        onTap: (route) => Navigator.pushNamed(context, route),
       ),
     );
   }

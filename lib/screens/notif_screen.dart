@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart';
 
 class NotifScreen extends StatelessWidget {
   const NotifScreen({super.key});
@@ -86,10 +85,6 @@ class NotifScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: CustomBottomNav(
-        currentRoute: '/notif',
-        onTap: (route) => Navigator.pushNamed(context, route),
       ),
     );
   }

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart' show CustomBottomNav, bottomPadding;
+import '../widgets/custom_bottom_nav.dart' show bottomPadding;
 
 class RequestsScreen extends StatefulWidget {
   const RequestsScreen({super.key});
@@ -364,10 +364,6 @@ class _RequestsScreenState extends State<RequestsScreen> {
                   ),
           ),
         ],
-      ),
-      bottomNavigationBar: CustomBottomNav(
-        currentRoute: '/requests',
-        onTap: (route) => Navigator.pushNamed(context, route),
       ),
     );
   }

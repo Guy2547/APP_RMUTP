@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart';
 
 class CoursesScreen extends StatefulWidget {
   const CoursesScreen({super.key});
@@ -134,10 +133,6 @@ class _CoursesScreenState extends State<CoursesScreen> {
             ),
           ),
         ],
-      ),
-      bottomNavigationBar: CustomBottomNav(
-        currentRoute: '/courses',
-        onTap: (route) => Navigator.pushNamed(context, route),
       ),
     );
   }

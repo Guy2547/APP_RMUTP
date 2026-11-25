@@ -4,7 +4,6 @@ import '../providers/app_database_provider.dart';
 import '../providers/role_provider.dart';
 import '../services/database_service.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -176,10 +175,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: CustomBottomNav(
-        currentRoute: '/profile',
-        onTap: (route) => Navigator.pushNamed(context, route),
-      ),
     );
   }
 
@@ -258,13 +253,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _settingRow('ความปลอดภัย', 'เปลี่ยนรหัสผ่าน', () {
                   Navigator.pushNamed(context, '/forgot-password');
                 }),
-                _settingRow('ออกจากระบบ', '', () {
-                  db.currentUser = db.currentUser; // placeholder
-                  Navigator.pushNamedAndRemoveUntil(
-                    context,
-                    '/login',
-                    (route) => false,
-                  );
+                _settingRow('ออกจากระบบ', '', () async {
+                  await DatabaseService.clearSession();
+                  if (mounted) {
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/login',
+                      (route) => false,
+                    );
+                  }
                 }, isDestructive: true),
               ],
             ),

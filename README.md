@@ -137,6 +137,44 @@ flutter build web
 - สำหรับ iOS ต้องใช้ Mac กับ Xcode ถ้าอยู่บน Windows จะรันได้แค่ Android (หรือทดสอบบน web ก่อนได้)
 - โปรเจกต์อยู่ที่ path ภาษาอังกฤษไม่มีช่องว่างแล้ว (`C:\data\My data\dev\APP`) จึงไม่มีปัญหา flutter analyze เรื่อง path ภาษาไทย
 
+## 🔒 การแก้ไขความปลอดภัยและ UI (ล่าสุด)
+
+### ปรับหน้า Login ตามดีไซน์ใหม่
+- เปลี่ยนพื้นหลังเป็นสีเทาอ่อน `#F5F3FA` เต็มจอ ไม่มี AppBar
+- โลโก้ RMUTP ใช้รูปภาพจาก `lib/assets/images/rmutp_logo.jpg` (ไฟล์จริงจากโฟลเดอร์ Logo App)
+- หัวข้อเป็น "Log in" ขนาดใหญ่ + คำอธิบาย "เข้าสู่มหาวิทยาลัยเทคโนโลยีราชมงคลพระนคร RMUTP"
+- ฟอร์มอีเมลและรหัสผ่านเป็นพื้นหลังขาว โค้งมน 16px มีไอคอนจดหมายและกุญแจ
+- ปุ่ม "ลืมรหัสผ่าน?" วางอยู่ขวาบนของฟิลด์รหัสผ่าน (overlay)
+- ปุ่ม "เข้าสู่ระบบ" สีม่วงเข้ม สูง 56px โค้งมน 16px
+- แถวล่างแสดง "ลืมรหัสผ่าน?" + "เข้าสู่บัญชี RMUTP" ในแถวเดียว
+- **ลบ** ส่วนตั้งค่าฐานข้อมูล (Supabase/University SQL) ออกจากหน้า Login
+- **ลบ** รายชื่อบัญชีทดสอบและรหัสผ่านที่แสดงใน UI ออกทั้งหมด
+
+### ลบแถบนำทางด้านล่างออกจากทุกหน้า
+- ลบ `CustomBottomNav` ออกจากทุกหน้าจอ (home, grades, timetable, courses, course-detail, grade-submit, attendance, news, news-detail, notif, requests, profile, help)
+- เหลือเฉพาะ `bottomPadding` สำหรับรองรับ safe area ของมือถือ
+
+### แก้ไขช่องโหว่ความปลอดภัย (Security Fixes)
+
+| ลำดับ | ช่องโหว่ | ระดับ | การแก้ไข |
+|-------|----------|-------|----------|
+| 1 | รหัสผ่านทดสอบ `password123` ฮาร์ดโค้ดใน `_localAccounts` | Critical | ลบ map `_localAccounts` ทั้งหมด ต้องยืนยันตัวตนผ่าน API จริงเท่านั้น |
+| 2 | ข้อมูลส่วนตัวจริง (เลขบัตรประชาชน, ที่อยู่, เบอร์โทร, ข้อมูลธนาคาร) ฝังในโค้ด | Critical | ลบ `_defaultDeepProfile()` และ `_defaultFinancialRecords()` ที่มีข้อมูลจริง แทนที่ด้วย dummy data ว่างเปล่า |
+| 3 | `teacherId = 'T-1024'` ค่าเริ่มต้นใน `saveTeacherGrades()` | High | เอาค่าเริ่มต้นออก บังคับต้องระบุ `teacherId` จาก session จริงเท่านั้น |
+| 4 | โทเค็นเข้าสู่ระบบเก็บใน static variable | High | ใช้ `flutter_secure_storage` เก็บใน Keystore/Keychain แทน ล้างเมื่อออกจากระบบ |
+| 5 | URL เขียนผิด `https:https://...` | Low | แก้เป็น `https://qnsdreorzllhpxsuilpa.supabase.co` |
+| 6 | รหัสระบุตัวตนเดาได้ (`7777...`, `6666...`, `#RQ-${second}`) | Medium | ใช้ `_generateUuid()` สร้าง UUID แบบสุ่มแทน |
+| 7 | เพิ่ม dependencies | — | `dio: ^5.7.0`, `flutter_secure_storage: ^9.0.0` |
+
+### ไฟล์ที่แก้ไขทั้งหมด (21 ไฟล์)
+- `pubspec.yaml` — เพิ่ม `dio`, `flutter_secure_storage`, assets รูปโลโก้
+- `pubspec.lock` — อัปเดตตาม dependencies ใหม่
+- `lib/services/database_service.dart` — ลบรหัสผ่านฮาร์ดโค้ด, ลบข้อมูลส่วนตัวจริง, ใช้ `FlutterSecureStorage`, สร้าง UUID สุ่ม, แก้ `teacherId` เป็น required parameter
+- `lib/providers/app_database_provider.dart` — ตรวจสอบ `teacherId` ก่อนส่งเกรด
+- `lib/screens/login_screen.dart` — เขียน UI ใหม่ทั้งหมด, ลบรหัสผ่าน grอกล่วงหน้า, ลบบัตรบัญชีทดสอบ
+- `lib/screens/home_screen.dart` — เขียนใหม่เป็นกริดเมนู 3×2 + แจ้งเตือน, ลบ bottom nav
+- `lib/screens/grades_screen.dart`, `course_detail_screen.dart`, `attendance_screen.dart`, `courses_screen.dart`, `grade_submit_screen.dart`, `help_screen.dart`, `news_detail_screen.dart`, `news_screen.dart`, `notif_screen.dart`, `profile_screen.dart`, `timetable_screen.dart`, `requests_screen.dart` — ลบ `CustomBottomNav` ออกทั้งหมด
+
 ## เอกสารอ้างอิง
 
 - `SESSION_SUMMARY.md` — บันทึกเซสชันแก้ไขก่อนหน้า (ปัญหา Gradle, java_home, google_fonts เวอร์ชัน ฯลฯ)
