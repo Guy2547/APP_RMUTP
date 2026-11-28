@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../models/attendance_summary.dart';
+import '../models/exam_event.dart';
 import '../models/grade.dart';
 import '../models/news_item.dart';
 import '../models/notification_item.dart';
@@ -29,10 +31,12 @@ class AppDatabaseProvider extends ChangeNotifier {
 
   // ข้อมูลเช็กชื่อจะถูกโหลดจากฐานข้อมูลเท่านั้น — ไม่เก็บข้อมูลตัวอย่างไว้ในแอป
   List<AttendanceRecordItem> attendanceRecords = [];
+  List<AttendanceCourseSummary> attendanceHistory = [];
 
   List<RequestItem> allRequests = [];
   List<NewsItem> newsList = [];
   List<NotificationItem> notifications = [];
+  List<ExamEvent> examEvents = [];
   List<String> academicCalendar = [];
 
   DatabaseBackendMode get backendMode => DatabaseConfig.currentMode;
@@ -107,9 +111,11 @@ class AppDatabaseProvider extends ChangeNotifier {
     studentGrades = [];
     teacherGradeRows = [];
     attendanceRecords = [];
+    attendanceHistory = [];
     allRequests = [];
     newsList = [];
     notifications = [];
+    examEvents = [];
     academicCalendar = [];
     isAttendanceRoomOpen = true;
     attachedHomeworkFile = null;
@@ -117,6 +123,18 @@ class AppDatabaseProvider extends ChangeNotifier {
     lastError = null;
     isLoading = false;
     notifyListeners();
+  }
+
+  /// ทำเครื่องหมายกล่องข้อความทั้งหมดว่าอ่านแล้ว (ทั้งในเครื่องและฐานข้อมูล)
+  Future<void> markAllNotificationsRead() async {
+    for (final item in notifications) {
+      item.isRead = true;
+    }
+    notifyListeners();
+
+    final stuId = currentUser?.studentId ?? '';
+    if (stuId.isEmpty) return;
+    await DatabaseService.markNotificationsRead(stuId);
   }
 
   /// โหลดข้อมูลทั้งหมดจากฐานข้อมูลตามผู้ใช้งานปัจจุบัน
@@ -131,6 +149,9 @@ class AppDatabaseProvider extends ChangeNotifier {
 
     studentProfile = await DatabaseService.fetchStudentDeepProfile(stuId);
     financialRecords = await DatabaseService.fetchFinancialRecords(stuId);
+    notifications = await DatabaseService.fetchNotifications(stuId);
+    attendanceHistory = await DatabaseService.fetchAttendanceHistory(stuId);
+    examEvents = await DatabaseService.fetchExamEvents();
 
     final remoteStudentTimetable =
         await DatabaseService.fetchStudentTimetable(stuId);

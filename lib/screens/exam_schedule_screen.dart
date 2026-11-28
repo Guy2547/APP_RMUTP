@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../models/exam_event.dart';
+import '../providers/app_database_provider.dart';
 
 const Color _kBg = Color(0xFFF7F6FA);
 const Color _kPrimary = Color(0xFF4A148C);
@@ -26,77 +29,43 @@ TextStyle _inter(double size, FontWeight weight, Color color) =>
       height: 1.45,
     );
 
-class _ExamItem {
+class ExamItem {
   final String date;
   final String timeRange;
   final String code;
   final String title;
   final String room;
   final String seat;
+  final String detail;
 
-  const _ExamItem({
+  const ExamItem({
     required this.date,
-    required this.timeRange,
-    required this.code,
+    this.timeRange = '',
+    this.code = '',
     required this.title,
-    required this.room,
-    required this.seat,
+    this.room = '',
+    this.seat = '',
+    this.detail = '',
   });
+
+  /// ตาราง academic_calendar_events ไม่มีข้อมูลห้อง/เลขที่นั่งรายวิชา
+  /// จึงแสดงเฉพาะสิ่งที่มีอยู่จริงในฐานข้อมูล
+  factory ExamItem.fromEvent(ExamEvent event) {
+    return ExamItem(
+      date: event.dateDisplay,
+      title: event.title,
+      detail: event.description,
+    );
+  }
 }
 
-const List<_ExamItem> _midtermExams = [
-  _ExamItem(
-    date: '17 ส.ค. 2569',
-    timeRange: '09:00 – 12:00',
-    code: '040203201',
-    title: 'การเขียนโปรแกรมเชิงวัตถุ',
-    room: 'อาคาร 6 ห้อง 604',
-    seat: '024',
-  ),
-  _ExamItem(
-    date: '19 ส.ค. 2569',
-    timeRange: '13:00 – 16:00',
-    code: '040203202',
-    title: 'ระบบฐานข้อมูล',
-    room: 'อาคาร 6 ห้อง 602',
-    seat: '018',
-  ),
-  _ExamItem(
-    date: '21 ส.ค. 2569',
-    timeRange: '09:00 – 12:00',
-    code: '040203205',
-    title: 'วิศวกรรมซอฟต์แวร์',
-    room: 'อาคาร 5 ห้อง 503',
-    seat: '032',
-  ),
-];
-
-const List<_ExamItem> _finalExams = [
-  _ExamItem(
-    date: '12 ต.ค. 2569',
-    timeRange: '09:00 – 12:00',
-    code: '040203201',
-    title: 'การเขียนโปรแกรมเชิงวัตถุ',
-    room: 'อาคาร 6 ห้อง 604',
-    seat: '024',
-  ),
-  _ExamItem(
-    date: '14 ต.ค. 2569',
-    timeRange: '13:00 – 16:00',
-    code: '040203202',
-    title: 'ระบบฐานข้อมูล',
-    room: 'อาคาร 6 ห้อง 602',
-    seat: '018',
-  ),
-  _ExamItem(
-    date: '16 ต.ค. 2569',
-    timeRange: '09:00 – 12:00',
-    code: '040203205',
-    title: 'วิศวกรรมซอฟต์แวร์',
-    room: 'อาคาร 5 ห้อง 503',
-    seat: '032',
-  ),
-];
+/// กรอบสอบจาก title ของ event ในฐานข้อมูล
+List<ExamItem> buildExamItems(List<ExamEvent> events, bool isFinal) {
+  return events
+      .where((e) => e.isFinal == isFinal)
+      .map(ExamItem.fromEvent)
+      .toList();
+}
 
 class ExamScheduleScreen extends StatefulWidget {
   const ExamScheduleScreen({super.key});
@@ -110,9 +79,11 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final exams = _selectedTab == 0 ? _midtermExams : _finalExams;
+    final db = context.watch<AppDatabaseProvider>();
+    final isFinal = _selectedTab == 1;
+    final exams = buildExamItems(db.examEvents, isFinal);
     final sectionTitle =
-        _selectedTab == 0 ? 'กำหนดการสอบกลางภาค' : 'กำหนดการสอบปลายภาค';
+        isFinal ? 'กำหนดการสอบปลายภาค' : 'กำหนดการสอบกลางภาค';
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -160,10 +131,19 @@ class _ExamScheduleScreenState extends State<ExamScheduleScreen> {
                 ],
               ),
               const SizedBox(height: 14),
-              for (int i = 0; i < exams.length; i++) ...[
-                if (i > 0) const SizedBox(height: 12),
-                _ExamCard(exam: exams[i]),
-              ],
+              if (exams.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 36),
+                  child: Text(
+                    'ยังไม่มีกำหนดการสอบในฐานข้อมูล',
+                    style: _thai(13, FontWeight.w400, _kMuted),
+                  ),
+                )
+              else
+                for (int i = 0; i < exams.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 12),
+                  _ExamCard(exam: exams[i]),
+                ],
             ],
           ),
         ),
@@ -278,7 +258,7 @@ class _ExamTypeTabs extends StatelessWidget {
 }
 
 class _ExamCard extends StatelessWidget {
-  final _ExamItem exam;
+  final ExamItem exam;
 
   const _ExamCard({required this.exam});
 
@@ -302,31 +282,41 @@ class _ExamCard extends StatelessWidget {
                 exam.date,
                 style: _thai(13, FontWeight.w600, _kPrimary),
               ),
-              Container(
-                width: 120,
-                height: 25,
-                decoration: BoxDecoration(
-                  color: _kChipBg,
-                  borderRadius: BorderRadius.circular(8),
+              if (exam.timeRange.isNotEmpty)
+                Container(
+                  width: 120,
+                  height: 25,
+                  decoration: BoxDecoration(
+                    color: _kChipBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    exam.timeRange,
+                    style: _inter(11, FontWeight.w600, _kPrimary),
+                  ),
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  exam.timeRange,
-                  style: _inter(11, FontWeight.w600, _kPrimary),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            exam.code,
-            style: _inter(10, FontWeight.w500, _kMuted),
-          ),
-          const SizedBox(height: 2),
+          if (exam.code.isNotEmpty) ...[
+            Text(
+              exam.code,
+              style: _inter(10, FontWeight.w500, _kMuted),
+            ),
+            const SizedBox(height: 2),
+          ],
           Text(
             exam.title,
             style: _thai(15, FontWeight.w600, _kInk),
           ),
+          if (exam.detail.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              exam.detail,
+              style: _thai(11, FontWeight.w400, _kMuted),
+            ),
+          ],
           const SizedBox(height: 12),
           const Divider(height: 1, thickness: 1, color: _kCardBorder),
           const SizedBox(height: 11),
@@ -344,7 +334,7 @@ class _ExamCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      exam.room,
+                      exam.room.isEmpty ? '-' : exam.room,
                       style: _thai(13, FontWeight.w500, _kInk),
                     ),
                   ],
@@ -370,7 +360,7 @@ class _ExamCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      exam.seat,
+                      exam.seat.isEmpty ? '-' : exam.seat,
                       style: GoogleFonts.inter(
                         fontSize: 21,
                         fontWeight: FontWeight.w700,

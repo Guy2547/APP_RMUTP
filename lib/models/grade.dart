@@ -5,12 +5,20 @@ class GradeItem {
   final double score;
   final bool isWarning;
 
+  // คอลัมน์จาก v_student_grades ที่ใช้จัดกลุ่มในหน้าผลการเรียน/ทรานสคริปต์
+  final int credits;
+  final String termLabel;
+  final bool isCurrent;
+
   GradeItem({
     required this.subjectCode,
     required this.subjectName,
     required this.letter,
     required this.score,
     this.isWarning = false,
+    this.credits = 3,
+    this.termLabel = '',
+    this.isCurrent = false,
   });
 }
 

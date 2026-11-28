@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../models/grade.dart';
+import '../providers/app_database_provider.dart';
 
 const Color _kBg = Color(0xFFF7F6FA);
 const Color _kPrimary = Color(0xFF4A148C);
@@ -26,13 +29,13 @@ TextStyle _inter(double size, FontWeight weight, Color color) =>
       height: 1.4,
     );
 
-class _CourseResult {
+class CourseResult {
   final String code;
   final String name;
   final int credits;
   final String grade;
 
-  const _CourseResult({
+  const CourseResult({
     required this.code,
     required this.name,
     required this.credits,
@@ -40,12 +43,12 @@ class _CourseResult {
   });
 }
 
-class _SemesterData {
+class SemesterData {
   final String label;
   final String gpa;
-  final List<_CourseResult> courses;
+  final List<CourseResult> courses;
 
-  const _SemesterData({
+  const SemesterData({
     required this.label,
     required this.gpa,
     required this.courses,
@@ -55,74 +58,39 @@ class _SemesterData {
       courses.fold<int>(0, (sum, item) => sum + item.credits);
 }
 
-const List<_SemesterData> _semesters = [
-  _SemesterData(
-    label: 'ภาคเรียนที่ 1/2569',
-    gpa: '4.00',
-    courses: [
-      _CourseResult(
-        code: '040203201',
-        name: 'การเขียนโปรแกรมเชิงวัตถุ',
-        credits: 3,
-        grade: 'A',
-      ),
-      _CourseResult(
-        code: '040203202',
-        name: 'ระบบฐานข้อมูล',
-        credits: 3,
-        grade: 'A',
-      ),
-      _CourseResult(
-        code: '040203203',
-        name: 'เครือข่ายคอมพิวเตอร์',
-        credits: 3,
-        grade: 'A',
-      ),
-      _CourseResult(
-        code: '040203204',
-        name: 'ระบบปฏิบัติการ',
-        credits: 3,
-        grade: 'A',
-      ),
-      _CourseResult(
-        code: '040203205',
-        name: 'วิศวกรรมซอฟต์แวร์',
-        credits: 3,
-        grade: 'A',
-      ),
-    ],
-  ),
-  _SemesterData(
-    label: 'ภาคเรียนที่ 2/2568',
-    gpa: '3.88',
-    courses: [
-      _CourseResult(
-        code: '040203105',
-        name: 'โครงสร้างข้อมูลและอัลกอริทึม',
-        credits: 3,
-        grade: 'A',
-      ),
-      _CourseResult(
-        code: '040203106',
-        name: 'สถาปัตยกรรมคอมพิวเตอร์',
-        credits: 3,
-        grade: 'A',
-      ),
-      _CourseResult(
-        code: '040203107',
-        name: 'คณิตศาสตร์ดิสครีต',
-        credits: 3,
-        grade: 'B+',
-      ),
-      _CourseResult(
-        code: '010101102',
-        name: 'ภาษาอังกฤษเพื่อการสื่อสาร',
-        credits: 3,
-        grade: 'A',
-      ),
-    ],
-  ),
-];
+/// จัดกลุ่มผลการเรียนจาก v_student_grades ตามภาคเรียน และคำนวณ GPA
+List<SemesterData> buildSemesters(List<GradeItem> grades) {
+  final byTerm = <String, List<GradeItem>>{};
+  for (final grade in grades) {
+    final term = grade.termLabel.isEmpty ? 'ไม่ระบุภาคเรียน' : grade.termLabel;
+    byTerm.putIfAbsent(term, () => []).add(grade);
+  }
+
+  return byTerm.entries.map((entry) {
+    final items = entry.value;
+    final totalCredits = items.fold<int>(0, (sum, g) => sum + g.credits);
+    final weighted = items.fold<double>(
+      0,
+      (sum, g) => sum + g.score * g.credits,
+    );
+    final gpa = totalCredits == 0 ? 0.0 : weighted / totalCredits;
+
+    return SemesterData(
+      label: entry.key,
+      gpa: gpa.toStringAsFixed(2),
+      courses: items
+          .map(
+            (g) => CourseResult(
+              code: g.subjectCode,
+              name: g.subjectName,
+              credits: g.credits,
+              grade: g.letter,
+            ),
+          )
+          .toList(),
+    );
+  }).toList();
+}
 
 class GradesScreen extends StatefulWidget {
   const GradesScreen({super.key});
@@ -135,6 +103,11 @@ class _GradesScreenState extends State<GradesScreen> {
   int _selectedSemesterIndex = 0;
 
   void _showSemesterPicker() {
+    final semesters = buildSemesters(
+      context.read<AppDatabaseProvider>().studentGrades,
+    );
+    if (semesters.isEmpty) return;
+
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
@@ -148,10 +121,10 @@ class _GradesScreenState extends State<GradesScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                for (int i = 0; i < _semesters.length; i++)
+                for (int i = 0; i < semesters.length; i++)
                   ListTile(
                     title: Text(
-                      _semesters[i].label,
+                      semesters[i].label,
                       style: _thai(
                         15,
                         i == _selectedSemesterIndex
@@ -178,7 +151,25 @@ class _GradesScreenState extends State<GradesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final semester = _semesters[_selectedSemesterIndex];
+    final db = context.watch<AppDatabaseProvider>();
+    final semesters = buildSemesters(db.studentGrades);
+
+    if (semesters.isEmpty) {
+      return Scaffold(
+        backgroundColor: _kBg,
+        appBar: _buildHeader(context, 'ผลการเรียน'),
+        body: Center(
+          child: Text(
+            'ยังไม่มีข้อมูลผลการเรียนในฐานข้อมูล',
+            style: _thai(14, FontWeight.w400, _kMuted),
+          ),
+        ),
+      );
+    }
+
+    final selectedIndex = _selectedSemesterIndex.clamp(0, semesters.length - 1);
+    final semester = semesters[selectedIndex];
+    final user = db.currentUser;
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -190,7 +181,11 @@ class _GradesScreenState extends State<GradesScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _AcademicSummaryCard(semesterGpa: semester.gpa),
+              _AcademicSummaryCard(
+                semesterGpa: semester.gpa,
+                gpax: user?.gpax.toStringAsFixed(2) ?? '-',
+                earnedCredits: user?.earnedCredits.toString() ?? '-',
+              ),
               const SizedBox(height: 20),
               _SemesterSelector(
                 label: semester.label,
@@ -283,8 +278,14 @@ class _BackChevronPainter extends CustomPainter {
 
 class _AcademicSummaryCard extends StatelessWidget {
   final String semesterGpa;
+  final String gpax;
+  final String earnedCredits;
 
-  const _AcademicSummaryCard({required this.semesterGpa});
+  const _AcademicSummaryCard({
+    required this.semesterGpa,
+    required this.gpax,
+    required this.earnedCredits,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +322,7 @@ class _AcademicSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            '3.90',
+            gpax,
             style: GoogleFonts.inter(
               fontSize: 44,
               fontWeight: FontWeight.w600,
@@ -371,7 +372,7 @@ class _AcademicSummaryCard extends StatelessWidget {
                       textBaseline: TextBaseline.alphabetic,
                       children: [
                         Text(
-                          '96',
+                          earnedCredits,
                           style: _inter(22, FontWeight.w600, Colors.white),
                         ),
                         const SizedBox(width: 8),
@@ -434,7 +435,7 @@ class _SemesterSelector extends StatelessWidget {
 }
 
 class _CourseGradeCard extends StatelessWidget {
-  final _CourseResult course;
+  final CourseResult course;
 
   const _CourseGradeCard({required this.course});
 

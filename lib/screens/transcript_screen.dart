@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../models/grade.dart';
+import '../providers/app_database_provider.dart';
 
 const Color _kBg = Color(0xFFF7F6FA);
 const Color _kPrimary = Color(0xFF4A148C);
@@ -30,13 +33,13 @@ TextStyle _inter(double size, FontWeight weight, Color color,
       height: height,
     );
 
-class _TranscriptCourse {
+class TranscriptCourse {
   final String code;
   final String name;
   final int credits;
   final String grade;
 
-  const _TranscriptCourse({
+  const TranscriptCourse({
     required this.code,
     required this.name,
     required this.credits,
@@ -44,13 +47,13 @@ class _TranscriptCourse {
   });
 }
 
-class _TranscriptSemester {
+class TranscriptSemester {
   final String title;
   final int totalCredits;
   final String gpa;
-  final List<_TranscriptCourse> courses;
+  final List<TranscriptCourse> courses;
 
-  const _TranscriptSemester({
+  const TranscriptSemester({
     required this.title,
     required this.totalCredits,
     required this.gpa,
@@ -58,88 +61,50 @@ class _TranscriptSemester {
   });
 }
 
-const List<_TranscriptSemester> _transcriptSemesters = [
-  _TranscriptSemester(
-    title: 'ภาคเรียนที่ 1/2569',
-    totalCredits: 15,
-    gpa: '4.00',
-    courses: [
-      _TranscriptCourse(
-        code: '040203201',
-        name: 'การเขียนโปรแกรมเชิงวัตถุ',
-        credits: 3,
-        grade: 'A',
-      ),
-      _TranscriptCourse(
-        code: '040203202',
-        name: 'ระบบฐานข้อมูล',
-        credits: 3,
-        grade: 'A',
-      ),
-      _TranscriptCourse(
-        code: '040203203',
-        name: 'เครือข่ายคอมพิวเตอร์',
-        credits: 3,
-        grade: 'A',
-      ),
-      _TranscriptCourse(
-        code: '040203204',
-        name: 'ระบบปฏิบัติการ',
-        credits: 3,
-        grade: 'A',
-      ),
-      _TranscriptCourse(
-        code: '040203205',
-        name: 'วิศวกรรมซอฟต์แวร์',
-        credits: 3,
-        grade: 'A',
-      ),
-    ],
-  ),
-  _TranscriptSemester(
-    title: 'ภาคเรียนที่ 2/2568',
-    totalCredits: 15,
-    gpa: '3.30',
-    courses: [
-      _TranscriptCourse(
-        code: '040203101',
-        name: 'การเขียนโปรแกรมคอมพิวเตอร์',
-        credits: 3,
-        grade: 'A',
-      ),
-      _TranscriptCourse(
-        code: '040203102',
-        name: 'โครงสร้างข้อมูล',
-        credits: 3,
-        grade: 'B+',
-      ),
-      _TranscriptCourse(
-        code: '040203103',
-        name: 'คณิตศาสตร์วิศวกรรม',
-        credits: 3,
-        grade: 'B',
-      ),
-      _TranscriptCourse(
-        code: '040203104',
-        name: 'วงจรดิจิทัล',
-        credits: 3,
-        grade: 'B',
-      ),
-      _TranscriptCourse(
-        code: '010100102',
-        name: 'ภาษาอังกฤษเพื่อการสื่อสาร',
-        credits: 3,
-        grade: 'B',
-      ),
-    ],
-  ),
-];
+/// สร้างระเบียนแสดงผลการเรียนจากผลการเรียนที่โหลดจากฐานข้อมูล
+List<TranscriptSemester> buildTranscriptSemesters(List<GradeItem> grades) {
+  final byTerm = <String, List<GradeItem>>{};
+  for (final grade in grades) {
+    final term = grade.termLabel.isEmpty ? 'ไม่ระบุภาคเรียน' : grade.termLabel;
+    byTerm.putIfAbsent(term, () => []).add(grade);
+  }
+
+  return byTerm.entries.map((entry) {
+    final items = entry.value;
+    final totalCredits = items.fold<int>(0, (sum, g) => sum + g.credits);
+    final weighted = items.fold<double>(
+      0,
+      (sum, g) => sum + g.score * g.credits,
+    );
+    final gpa = totalCredits == 0 ? 0.0 : weighted / totalCredits;
+
+    return TranscriptSemester(
+      title: entry.key,
+      totalCredits: totalCredits,
+      gpa: gpa.toStringAsFixed(2),
+      courses: items
+          .map(
+            (g) => TranscriptCourse(
+              code: g.subjectCode,
+              name: g.subjectName,
+              credits: g.credits,
+              grade: g.letter,
+            ),
+          )
+          .toList(),
+    );
+  }).toList();
+}
 
 class TranscriptScreen extends StatelessWidget {
   const TranscriptScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final db = context.watch<AppDatabaseProvider>();
+    final user = db.currentUser;
+    final semesters = buildTranscriptSemesters(db.studentGrades);
+
     return Scaffold(
       backgroundColor: _kBg,
       appBar: _buildHeader(context, 'ทรานสคริปต์'),
@@ -151,7 +116,12 @@ class TranscriptScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _StudentSummaryCard(),
+                  _StudentSummaryCard(
+                    displayName: user?.displayName ?? '-',
+                    studentId: user?.studentId ?? '-',
+                    program: user?.subtitleInfo ?? '-',
+                    gpax: user?.gpax.toStringAsFixed(2) ?? '-',
+                  ),
                   const SizedBox(height: 22),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -169,7 +139,7 @@ class TranscriptScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Expanded(child: _DocumentPreviewCard()),
+                  Expanded(child: _DocumentPreviewCard(semesters: semesters)),
                 ],
               ),
             ),
@@ -250,7 +220,17 @@ class _BackChevronPainter extends CustomPainter {
 }
 
 class _StudentSummaryCard extends StatelessWidget {
-  const _StudentSummaryCard();
+  final String displayName;
+  final String studentId;
+  final String program;
+  final String gpax;
+
+  const _StudentSummaryCard({
+    required this.displayName,
+    required this.studentId,
+    required this.program,
+    required this.gpax,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -269,12 +249,12 @@ class _StudentSummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Theerachut',
+                  displayName,
                   style: _inter(19, FontWeight.w600, _kInk),
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '65012345678-9',
+                  studentId,
                   style: _inter(12, FontWeight.w500, _kMuted),
                 ),
                 const SizedBox(height: 22),
@@ -284,8 +264,10 @@ class _StudentSummaryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'วศ.บ. วิศวกรรมคอมพิวเตอร์',
+                  program,
                   style: _thai(12, FontWeight.w500, _kInk),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -307,7 +289,7 @@ class _StudentSummaryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '3.90',
+                  gpax,
                   style: _inter(29, FontWeight.w700, _kPrimary, height: 1.2),
                 ),
                 const SizedBox(height: 4),
@@ -325,7 +307,9 @@ class _StudentSummaryCard extends StatelessWidget {
 }
 
 class _DocumentPreviewCard extends StatelessWidget {
-  const _DocumentPreviewCard();
+  final List<TranscriptSemester> semesters;
+
+  const _DocumentPreviewCard({required this.semesters});
 
   @override
   Widget build(BuildContext context) {
@@ -356,13 +340,22 @@ class _DocumentPreviewCard extends StatelessWidget {
               child: Divider(height: 1, thickness: 1, color: _kCardBorder),
             ),
             const SizedBox(height: 13),
-            for (int i = 0; i < _transcriptSemesters.length; i++) ...[
-              if (i > 0) const SizedBox(height: 24),
-              _SemesterTable(semester: _transcriptSemesters[i]),
-            ],
+            if (semesters.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Text(
+                  'ยังไม่มีข้อมูลผลการเรียนในฐานข้อมูล',
+                  style: _thai(12, FontWeight.w400, _kMuted),
+                ),
+              )
+            else
+              for (int i = 0; i < semesters.length; i++) ...[
+                if (i > 0) const SizedBox(height: 24),
+                _SemesterTable(semester: semesters[i]),
+              ],
             const SizedBox(height: 18),
             Text(
-              'แสดงผลการเรียน 2 ภาคเรียนล่าสุด',
+              'แสดงผลการเรียน ${semesters.length} ภาคเรียนล่าสุด',
               style: _thai(9, FontWeight.w400, _kMuted),
             ),
           ],
@@ -373,7 +366,7 @@ class _DocumentPreviewCard extends StatelessWidget {
 }
 
 class _SemesterTable extends StatelessWidget {
-  final _TranscriptSemester semester;
+  final TranscriptSemester semester;
 
   const _SemesterTable({required this.semester});
 

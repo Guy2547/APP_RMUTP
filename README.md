@@ -204,12 +204,36 @@ flutter build web
 | มีไฟล์โลโก้ซ้ำใน `lib/assets/images/` | คopi UI ต้นฉบับเข้ามาแล้วไม่ได้ใช้ | ลบออก เหลือเฉพาะ `assets/images/rmutp_logo.png` ที่ประกาศใน pubspec |
 
 ### ผลการตรวจสอบ
-- `flutter test` → **44 tests passed**
+- `flutter test` → **59 tests passed**
 - `flutter analyze` → **No issues found**
 - `google_fonts` ยังล็อกอยู่ที่ **8.2.1** (ห้าม upgrade เป็น 9.x เพราะจะเกิด error `TextTheme`)
 
 ### หมายเหตุ
-บางหน้ายังใช้ array ข้อมูลคงที่ที่มากับ UI ต้นฉบับ (เช่น `attendance_screen.dart`, `exam_schedule_screen.dart`, `grades_screen.dart`, `timetable_screen.dart`, `transcript_screen.dart`, `notif_screen.dart`) ยังไม่ได้แปลงเป็นข้อมูลจากฐานข้อมูลทั้งหมด
+รอบถัดมา (ด้านล่าง) แปลงหน้าที่เหลือให้ดึงข้อมูลจากฐานข้อมูลจริงแล้ว
+
+## 🆕 รอบ work ล่าสุด: แปลงทุกหน้าที่เหลือให้ดึงจาก DB + Unit Test
+
+### สิ่งที่ทำเพิ่ม
+- `timetable_screen.dart`: ลบ array `_weeklySchedule` ใช้ `db.getTimetableForDay()` จาก `v_student_timetable` / `v_teacher_timetable`; แปลงช่วงเวลา `'09:00–12:00'` เป็นจำนวนชั่วโมงด้วย `hoursFromTime()`
+- `grades_screen.dart`: ลบ array `_semesters` ใช้ `buildSemesters(db.studentGrades)` จาก `v_student_grades`, จัดกลุ่มตาม `term_label` และคำนวณ GPA แบบถ่วงน้ำหนักหน่วยกิต; GPAX/หน่วยกิตสะสมอ่านจาก `currentUser`
+- `transcript_screen.dart`: ใช้ `buildTranscriptSemesters(db.studentGrades)` และแสดงชื่อ/รหัส/GPAX จาก session แทนค่าที่ฝังไว้
+- `notif_screen.dart`: ใช้ `db.notifications` (ตาราง `notifications`), เพิ่ม `fetchNotifications()` / `markNotificationsRead()` ใน `DatabaseService` และ `markAllNotificationsRead()` ใน provider (อัปเดตสถานะในเครื่องทันที แล้ว PATCH ขึ้น DB ถ้ามี session)
+- `attendance_screen.dart`: ใช้ `db.attendanceHistory` ที่รวมจาก `attendance_records` → `attendance_sessions` → `subjects`; ปุ่มเช็คชื่อเรียก `db.checkInCurrentStudent()` จริง แทนข้อความจำลอง
+- `exam_schedule_screen.dart`: ใช้ `db.examEvents` จาก `academic_calendar_events` (`event_type='exam'`) แทนตารางสอบที่ฝังไว้; แยกกลางภาค/ปลายภาคจากชื่อ event
+- โมเดลใหม่: `attendance_summary.dart`, `exam_event.dart`; ขยาย `GradeItem` ด้วย `credits/termLabel/isCurrent` และ `NotificationItem` ด้วย `isRead/createdAt`
+- ทุกหน้าเมื่อไม่มีข้อมูลจาก DB จะแสดง empty state แทนข้อมูลตัวอย่าง และ `logout()` ล้างข้อมูลใหม่ทั้งหมด
+- **Unit test ใหม่**: `test/unit/database_driven_data_test.dart` ครอบคลุม mapper ของ `v_student_grades`, การคำนวณ GPA, `hoursFromTime`, `AttendanceCourseSummary`, การแยก event สอบ, และ provider (mark-read / logout)
+
+### ปัญหาที่พบ และวิธีแก้
+| ปัญหาที่เจอ | สาเหตุ | วิธีแก้ |
+|-------------|--------|--------|
+| Unit test `markAllNotificationsRead` fail | provider `return` ทันทีเมื่อไม่มี `currentUser` เลยไม่ได้อัปเดตสถานะในเครื่อง | อัปเดต `isRead` + `notifyListeners()` ก่อน แล้วค่อยยิง PATCH เฉพาะเมื่อมี `studentId` |
+| `flutter analyze` ฟ้อง `library_private_types_in_public_api` | เปิด helper `buildSemesters()` / `buildTranscriptSemesters()` เป็น public เพื่อเทส แต่ return type เป็นคลาส private | เปลี่ยน `SemesterData`, `CourseResult`, `TranscriptSemester`, `TranscriptCourse` เป็น public |
+| ตาราง `academic_calendar_events` ไม่มีห้องสอบ/เลขที่นั่งรายวิชา | schema เก็บแค่ event ระดับสัปดาห์ (`date_display`, `description`) | แสดงเฉพาะข้อมูลที่มีจริงใน DB; ช่องที่ไม่มีแสดง `-` และไม่สร้างข้อมูลขึ้นเอง |
+
+### ผลการตรวจสอบ (รอบนี้)
+- `flutter test --reporter compact` → **59 tests passed**
+- `flutter analyze` → **No issues found**
 
 ## เอกสารอ้างอิง
 

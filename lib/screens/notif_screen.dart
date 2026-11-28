@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_database_provider.dart';
 
 const Color _kBg = Color(0xFFF7F6FA);
 const Color _kPrimary = Color(0xFF4A148C);
@@ -52,53 +54,37 @@ class NotifScreen extends StatefulWidget {
 class _NotifScreenState extends State<NotifScreen> {
   int _filterIndex = 0; // 0: ทั้งหมด, 1: ประกาศมหาวิทยาลัย, 2: ข้อความส่วนตัว
 
-  final List<_InboxMessage> _messages = [
-    _InboxMessage(
-      sender: 'กองพัฒนานักศึกษา',
-      title: 'เปิดรับสมัครทุนการศึกษา',
-      preview: 'ทุนสนับสนุนการศึกษา ประจำปี 2569\nสมัครได้ถึงวันที่ 30 พฤศจิกายนนี้',
-      time: 'วันนี้ · 09:15 น.',
-      icon: Icons.account_balance_outlined,
-      category: _MessageCategory.university,
-      unread: true,
-    ),
-    _InboxMessage(
-      sender: 'สำนักส่งเสริมวิชาการฯ',
-      title: 'แจ้งกำหนดลงทะเบียนเรียน',
-      preview: 'ตรวจสอบรายวิชาและแผนการเรียน\nก่อนลงทะเบียนภาคเรียนถัดไป',
-      time: 'วันนี้ · 08:40 น.',
-      icon: Icons.description_outlined,
-      category: _MessageCategory.university,
-      unread: true,
-    ),
-    _InboxMessage(
-      sender: 'อ.ดร. ธนกร วัฒนกุล',
-      title: 'นัดหมายอาจารย์ที่ปรึกษา',
-      preview: 'ขอให้นักศึกษาเข้าพบเพื่อวางแผน\nการเรียนในภาคเรียนถัดไป',
-      time: 'เมื่อวาน · 16:30 น.',
-      icon: Icons.person_outline_rounded,
-      category: _MessageCategory.personal,
-      unread: true,
-    ),
-    _InboxMessage(
-      sender: 'สำนักวิทยบริการฯ',
-      title: 'ขยายเวลาบริการห้องสมุด',
-      preview: 'เปิดบริการถึง 20:00 น. ในช่วงสอบ\nพร้อมพื้นที่อ่านหนังสือเพิ่มเติม',
-      time: 'เมื่อวาน · 11:00 น.',
-      icon: Icons.menu_book_outlined,
-      category: _MessageCategory.university,
-      unread: false,
-    ),
-    _InboxMessage(
-      sender: 'คณะวิศวกรรมศาสตร์',
-      title: 'กิจกรรมพบผู้ประกอบการ',
-      preview: 'พบเส้นทางอาชีพและโอกาสฝึกงาน\nสำหรับนักศึกษาคณะวิศวกรรมศาสตร์',
-      time: '16 พ.ย. 2569 · 14:20 น.',
-      icon: Icons.account_balance_outlined,
-      category: _MessageCategory.university,
-      unread: false,
-    ),
-  ];
+  DateTime? _parseCreatedAt(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    return DateTime.tryParse(raw);
+  }
+
+  String _formatTime(String? raw) {
+    final dt = _parseCreatedAt(raw);
+    if (dt == null) return '';
+    final now = DateTime.now();
+    final hhmm =
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    final isToday = dt.year == now.year &&
+        dt.month == now.month &&
+        dt.day == now.day;
+    if (isToday) return 'วันนี้ · $hhmm น.';
+    return '${dt.day}/${dt.month}/${dt.year} · $hhmm น.';
+  }
+
+  List<_InboxMessage> get _messages {
+    return context.read<AppDatabaseProvider>().notifications.map((n) {
+      return _InboxMessage(
+        sender: 'RMUTP',
+        title: n.title,
+        preview: n.subtitle,
+        time: _formatTime(n.createdAt),
+        icon: Icons.campaign_outlined,
+        category: _MessageCategory.university,
+        unread: !n.isRead,
+      );
+    }).toList();
+  }
 
   int get _unreadCount => _messages.where((m) => m.unread).length;
 
@@ -116,13 +102,10 @@ class _NotifScreenState extends State<NotifScreen> {
     return _messages;
   }
 
-  void _markAllAsRead() {
+  Future<void> _markAllAsRead() async {
     if (_unreadCount == 0) return;
-    setState(() {
-      for (final m in _messages) {
-        m.unread = false;
-      }
-    });
+    await context.read<AppDatabaseProvider>().markAllNotificationsRead();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -136,6 +119,7 @@ class _NotifScreenState extends State<NotifScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<AppDatabaseProvider>();
     final visible = _filteredMessages;
 
     return Scaffold(

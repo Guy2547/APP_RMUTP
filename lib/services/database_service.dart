@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
+import '../models/attendance_summary.dart';
+import '../models/exam_event.dart';
 import '../models/grade.dart';
 import '../models/news_item.dart';
+import '../models/notification_item.dart';
 import '../models/request_item.dart';
 import '../models/subject.dart';
 import 'database_config.dart';
@@ -503,6 +506,10 @@ class DatabaseService {
                 letter: r['letter']?.toString() ?? 'A (4.0)',
                 score: double.tryParse(r['score']?.toString() ?? '4.0') ?? 4.0,
                 isWarning: r['is_warning'] == true,
+                credits:
+                    int.tryParse(r['credits']?.toString() ?? '3') ?? 3,
+                termLabel: r['term_label']?.toString() ?? '',
+                isCurrent: r['is_current'] == true,
               );
             }).toList();
           }
@@ -854,6 +861,179 @@ class DatabaseService {
         }
       } catch (_) {}
     }
+    return [];
+  }
+
+  /// กำหนดการสอบจากตาราง academic_calendar_events (event_type = 'exam')
+  static Future<List<ExamEvent>> fetchExamEvents() async {
+    if (!canCallRemoteApi) return [];
+    try {
+      final uri = Uri.parse(
+        '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.tableCalendarEvents}'
+        '?event_type=eq.exam&select=title,date_display,start_date,end_date,description&order=start_date.asc',
+      );
+      final res = await http
+          .get(uri, headers: DatabaseConfig.defaultHeaders)
+          .timeout(_timeout);
+      if (res.statusCode != 200) return [];
+      final List<dynamic> list = jsonDecode(res.body);
+      return list.map((e) {
+        final r = e as Map<String, dynamic>;
+        return ExamEvent(
+          title: r['title']?.toString() ?? '',
+          dateDisplay: r['date_display']?.toString() ?? '',
+          startDate: r['start_date']?.toString() ?? '',
+          endDate: r['end_date']?.toString(),
+          description: r['description']?.toString() ?? '',
+        );
+      }).toList();
+    } catch (_) {}
+    return [];
+  }
+
+  /// กล่องข้อความของนักศึกษาที่ล็อกอินอยู่ (ตาราง notifications)
+  static Future<List<NotificationItem>> fetchNotifications(
+    String studentId,
+  ) async {
+    if (canCallRemoteApi) {
+      try {
+        final uri = Uri.parse(
+          '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.tableNotifications}?student_id=eq.${Uri.encodeComponent(studentId)}&order=created_at.desc',
+        );
+        final res = await http
+            .get(uri, headers: DatabaseConfig.defaultHeaders)
+            .timeout(_timeout);
+        if (res.statusCode == 200) {
+          final List<dynamic> list = jsonDecode(res.body);
+          return list.map((e) {
+            final r = e as Map<String, dynamic>;
+            return NotificationItem(
+              title: r['title']?.toString() ?? '',
+              subtitle: r['subtitle']?.toString() ?? '',
+              accentColor: _parseHexColor(
+                r['accent_color_hex']?.toString() ?? '#652D91',
+              ),
+              isRead: r['is_read'] == true,
+              createdAt: r['created_at']?.toString(),
+            );
+          }).toList();
+        }
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  /// ทำเครื่องหมายข้อความทั้งหมดของนักศึกษาว่าอ่านแล้ว
+  static Future<void> markNotificationsRead(String studentId) async {
+    if (!canCallRemoteApi) return;
+    try {
+      final uri = Uri.parse(
+        '${DatabaseConfig.activeRestBaseUrl}/${DatabaseConfig.tableNotifications}?student_id=eq.${Uri.encodeComponent(studentId)}',
+      );
+      await http
+          .patch(
+            uri,
+            headers: DatabaseConfig.defaultHeaders,
+            body: jsonEncode({'is_read': true}),
+          )
+          .timeout(_timeout);
+    } catch (_) {}
+  }
+
+  /// สรุปสถิติเช็กชื่อรายวิชาของนักศึกษา
+  /// รวม attendance_records → attendance_sessions → subjects
+  static Future<List<AttendanceCourseSummary>> fetchAttendanceHistory(
+    String studentId,
+  ) async {
+    if (!canCallRemoteApi) return [];
+    try {
+      final base = DatabaseConfig.activeRestBaseUrl;
+      final recordsUri = Uri.parse(
+        '$base/${DatabaseConfig.tableAttendanceRecords}?student_id=eq.${Uri.encodeComponent(studentId)}&select=session_id,status',
+      );
+      final recordsRes = await http
+          .get(recordsUri, headers: DatabaseConfig.defaultHeaders)
+          .timeout(_timeout);
+      if (recordsRes.statusCode != 200) return [];
+      final List<dynamic> records = jsonDecode(recordsRes.body);
+      if (records.isEmpty) return [];
+
+      final sessionIds = <String>{};
+      for (final e in records) {
+        final sid = (e as Map<String, dynamic>)['session_id']?.toString();
+        if (sid != null && sid.isNotEmpty) sessionIds.add(sid);
+      }
+      if (sessionIds.isEmpty) return [];
+
+      final sessionsUri = Uri.parse(
+        '$base/${DatabaseConfig.tableAttendanceSessions}?id=in.(${sessionIds.join(',')})&select=id,subject_code',
+      );
+      final sessionsRes = await http
+          .get(sessionsUri, headers: DatabaseConfig.defaultHeaders)
+          .timeout(_timeout);
+      if (sessionsRes.statusCode != 200) return [];
+
+      final sessionToSubject = <String, String>{};
+      final subjectCodes = <String>{};
+      for (final e in jsonDecode(sessionsRes.body) as List<dynamic>) {
+        final m = e as Map<String, dynamic>;
+        final sid = m['id']?.toString();
+        final code = m['subject_code']?.toString();
+        if (sid != null && code != null) {
+          sessionToSubject[sid] = code;
+          subjectCodes.add(code);
+        }
+      }
+      if (subjectCodes.isEmpty) return [];
+
+      final subjectNames = <String, String>{};
+      final subjectsUri = Uri.parse(
+        '$base/${DatabaseConfig.tableSubjects}?subject_code=in.(${subjectCodes.join(',')})&select=subject_code,name_th',
+      );
+      final subjectsRes = await http
+          .get(subjectsUri, headers: DatabaseConfig.defaultHeaders)
+          .timeout(_timeout);
+      if (subjectsRes.statusCode == 200) {
+        for (final e in jsonDecode(subjectsRes.body) as List<dynamic>) {
+          final m = e as Map<String, dynamic>;
+          final code = m['subject_code']?.toString();
+          final name = m['name_th']?.toString();
+          if (code != null && name != null) subjectNames[code] = name;
+        }
+      }
+
+      // [present, late, absent] ต่อรหัสวิชา
+      final counts = <String, List<int>>{};
+      for (final e in records) {
+        final m = e as Map<String, dynamic>;
+        final code = sessionToSubject[m['session_id']?.toString()];
+        if (code == null) continue;
+        final row = counts.putIfAbsent(code, () => [0, 0, 0]);
+        switch (m['status']?.toString()) {
+          case 'present':
+            row[0]++;
+            break;
+          case 'late':
+            row[1]++;
+            break;
+          case 'absent':
+            row[2]++;
+            break;
+        }
+      }
+
+      return counts.entries
+          .map(
+            (entry) => AttendanceCourseSummary(
+              subjectCode: entry.key,
+              subjectName: subjectNames[entry.key] ?? entry.key,
+              present: entry.value[0],
+              late: entry.value[1],
+              absent: entry.value[2],
+            ),
+          )
+          .toList();
+    } catch (_) {}
     return [];
   }
 

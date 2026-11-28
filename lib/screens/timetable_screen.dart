@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_database_provider.dart';
 
 const Color _kBg = Color(0xFFF7F6FA);
 const Color _kPrimary = Color(0xFF4A148C);
@@ -59,115 +61,58 @@ class _DaySchedule {
   int get totalHours => classes.fold<int>(0, (sum, c) => sum + c.hours);
 }
 
-const List<_DaySchedule> _weeklySchedule = [
-  _DaySchedule(
-    shortEn: 'Mon',
-    fullTh: 'วันจันทร์',
-    classes: [
-      _ClassSlot(
-        timeRange: '09:00 – 12:00',
-        hours: 3,
-        code: '040203201',
-        title: 'การเขียนโปรแกรมเชิงวัตถุ',
-        location: 'อาคาร 6 ห้อง 604',
-        instructor: 'อ.ดร. ธนกร วัฒนกุล',
-      ),
-      _ClassSlot(
-        timeRange: '13:00 – 15:00',
-        hours: 2,
-        code: '040203202',
-        title: 'ระบบฐานข้อมูล',
-        location: 'อาคาร 6 ห้อง 602',
-        instructor: 'อ. ศิริพร ใจดี',
-      ),
-      _ClassSlot(
-        timeRange: '15:00 – 17:00',
-        hours: 2,
-        code: '040203205',
-        title: 'วิศวกรรมซอฟต์แวร์',
-        location: 'อาคาร 5 ห้อง 503',
-        instructor: 'อ.ดร. กิตติพงษ์ สุขสวัสดิ์',
-      ),
-    ],
-  ),
-  _DaySchedule(
-    shortEn: 'Tue',
-    fullTh: 'วันอังคาร',
-    classes: [
-      _ClassSlot(
-        timeRange: '09:00 – 12:00',
-        hours: 3,
-        code: '040203203',
-        title: 'เครือข่ายคอมพิวเตอร์',
-        location: 'อาคาร 6 ห้อง Lab 601',
-        instructor: 'ผศ. นภัส พงศ์ไพศาล',
-      ),
-      _ClassSlot(
-        timeRange: '13:00 – 16:00',
-        hours: 3,
-        code: '040203204',
-        title: 'ระบบปฏิบัติการ',
-        location: 'อาคาร 6 ห้อง 605',
-        instructor: 'อ. วรพล ชัยชนะ',
-      ),
-    ],
-  ),
-  _DaySchedule(
-    shortEn: 'Wed',
-    fullTh: 'วันพุธ',
-    classes: [
-      _ClassSlot(
-        timeRange: '10:00 – 12:00',
-        hours: 2,
-        code: '040203202',
-        title: 'ปฏิบัติการระบบฐานข้อมูล',
-        location: 'อาคาร 6 ห้อง Lab 602',
-        instructor: 'อ. ศิริพร ใจดี',
-      ),
-    ],
-  ),
-  _DaySchedule(
-    shortEn: 'Thu',
-    fullTh: 'วันพฤหัสบดี',
-    classes: [
-      _ClassSlot(
-        timeRange: '09:00 – 12:00',
-        hours: 3,
-        code: '040203205',
-        title: 'วิศวกรรมซอฟต์แวร์',
-        location: 'อาคาร 5 ห้อง 503',
-        instructor: 'อ.ดร. กิตติพงษ์ สุขสวัสดิ์',
-      ),
-      _ClassSlot(
-        timeRange: '13:00 – 15:00',
-        hours: 2,
-        code: '040203201',
-        title: 'ปฏิบัติการเขียนโปรแกรมเชิงวัตถุ',
-        location: 'อาคาร 6 ห้อง Lab 604',
-        instructor: 'อ.ดร. ธนกร วัฒนกุล',
-      ),
-    ],
-  ),
-  _DaySchedule(
-    shortEn: 'Fri',
-    fullTh: 'วันศุกร์',
-    classes: [
-      _ClassSlot(
-        timeRange: '09:00 – 12:00',
-        hours: 3,
-        code: '040203203',
-        title: 'เครือข่ายคอมพิวเตอร์',
-        location: 'อาคาร 6 ห้อง 603',
-        instructor: 'ผศ. นภัส พงศ์ไพศาล',
-      ),
-    ],
-  ),
-  _DaySchedule(
-    shortEn: 'Sat',
-    fullTh: 'วันเสาร์',
-    classes: [],
-  ),
+const List<_DayMeta> _dayMetas = [
+  _DayMeta('Mon', 'วันจันทร์', 'mon'),
+  _DayMeta('Tue', 'วันอังคาร', 'tue'),
+  _DayMeta('Wed', 'วันพุธ', 'wed'),
+  _DayMeta('Thu', 'วันพฤหัสบดี', 'thu'),
+  _DayMeta('Fri', 'วันศุกร์', 'fri'),
+  _DayMeta('Sat', 'วันเสาร์', 'sat'),
 ];
+
+class _DayMeta {
+  final String shortEn;
+  final String fullTh;
+  final String key;
+
+  const _DayMeta(this.shortEn, this.fullTh, this.key);
+}
+
+/// นับชั่วโมงจากรูปแบบเวลาในฐานข้อมูล เช่น '09:00–12:00'
+int hoursFromTime(String time) {
+  final parts = time.split(RegExp(r'[–—-]'));
+  if (parts.length != 2) return 3;
+  final start = int.tryParse(parts[0].trim().split(':').first);
+  final end = int.tryParse(parts[1].trim().split(':').first);
+  if (start == null || end == null || end <= start) return 3;
+  return end - start;
+}
+
+/// สร้างตารางจากข้อมูลที่โหลดจาก v_student_timetable / v_teacher_timetable
+List<_DaySchedule> _buildWeeklySchedule(AppDatabaseProvider db) {
+  final isTeacher = db.currentUser?.isTeacher ?? false;
+  return _dayMetas
+      .map(
+        (meta) => _DaySchedule(
+          shortEn: meta.shortEn,
+          fullTh: meta.fullTh,
+          classes: db
+              .getTimetableForDay(isTeacher, meta.key)
+              .map(
+                (subject) => _ClassSlot(
+                  timeRange: subject.time,
+                  hours: hoursFromTime(subject.time),
+                  code: subject.code,
+                  title: subject.name,
+                  location: subject.room,
+                  instructor: subject.teacher,
+                ),
+              )
+              .toList(),
+        ),
+      )
+      .toList();
+}
 
 class TimetableScreen extends StatefulWidget {
   const TimetableScreen({super.key});
@@ -181,7 +126,10 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final day = _weeklySchedule[_selectedDayIndex];
+    final db = context.watch<AppDatabaseProvider>();
+    final schedule = _buildWeeklySchedule(db);
+    final dayIndex = _selectedDayIndex.clamp(0, schedule.length - 1);
+    final day = schedule[dayIndex];
 
     return Scaffold(
       backgroundColor: _kBg,
@@ -210,12 +158,12 @@ class _TimetableScreenState extends State<TimetableScreen> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  for (int i = 0; i < _weeklySchedule.length; i++) ...[
+                  for (int i = 0; i < schedule.length; i++) ...[
                     if (i > 0) const SizedBox(width: 6),
                     Expanded(
                       child: _WeekdayPill(
-                        label: _weeklySchedule[i].shortEn,
-                        selected: i == _selectedDayIndex,
+                        label: schedule[i].shortEn,
+                        selected: i == dayIndex,
                         onTap: () =>
                             setState(() => _selectedDayIndex = i),
                       ),

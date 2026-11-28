@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_database_provider.dart';
 
 const Color _kBg = Color(0xFFF7F6FA);
 const Color _kPrimary = Color(0xFF4A148C);
@@ -51,27 +53,6 @@ class _CourseAttendance {
   int get percent => ((attended / total) * 100).round();
 }
 
-const List<_CourseAttendance> _attendanceHistory = [
-  _CourseAttendance(
-    title: 'การเขียนโปรแกรมเชิงวัตถุ',
-    present: 12,
-    late: 2,
-    absent: 1,
-  ),
-  _CourseAttendance(
-    title: 'ระบบฐานข้อมูล',
-    present: 13,
-    late: 1,
-    absent: 1,
-  ),
-  _CourseAttendance(
-    title: 'วิศวกรรมซอฟต์แวร์',
-    present: 11,
-    late: 1,
-    absent: 3,
-  ),
-];
-
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
 
@@ -82,12 +63,17 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen> {
   bool _checkedIn = false;
 
-  void _handleScanCheckIn() {
-    setState(() => _checkedIn = true);
+  Future<void> _handleScanCheckIn() async {
+    final db = context.read<AppDatabaseProvider>();
+    final time = await db.checkInCurrentStudent();
+    if (!mounted) return;
+    setState(() => _checkedIn = time.isNotEmpty);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'เช็คชื่อเข้าเรียนวิชา 040203201 เรียบร้อยแล้ว',
+          time.isEmpty
+              ? (db.lastError ?? 'เช็คชื่อไม่สำเร็จ')
+              : 'เช็คชื่อเข้าเรียนเวลา $time น. เรียบร้อยแล้ว',
           style: _thai(13, FontWeight.w400, Colors.white),
         ),
         backgroundColor: _kPrimary,
@@ -97,6 +83,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final db = context.watch<AppDatabaseProvider>();
+    final history = db.attendanceHistory
+        .map(
+          (item) => _CourseAttendance(
+            title: item.subjectName,
+            present: item.present,
+            late: item.late,
+            absent: item.absent,
+          ),
+        )
+        .toList();
+
     return Scaffold(
       backgroundColor: _kBg,
       appBar: _buildHeader(context, 'เช็คชื่อ'),
@@ -128,10 +126,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              for (int i = 0; i < _attendanceHistory.length; i++) ...[
-                if (i > 0) const SizedBox(height: 12),
-                _AttendanceHistoryCard(record: _attendanceHistory[i]),
-              ],
+              if (history.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Text(
+                    'ยังไม่มีประวัติการเช็กชื่อในฐานข้อมูล',
+                    style: _thai(13, FontWeight.w400, _kMuted),
+                  ),
+                )
+              else
+                for (int i = 0; i < history.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 12),
+                  _AttendanceHistoryCard(record: history[i]),
+                ],
             ],
           ),
         ),
