@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 import 'package:rmutp_campus_app/models/attendance_summary.dart';
 import 'package:rmutp_campus_app/models/exam_event.dart';
 import 'package:rmutp_campus_app/models/grade.dart';
@@ -7,6 +8,7 @@ import 'package:rmutp_campus_app/models/notification_item.dart';
 import 'package:rmutp_campus_app/providers/app_database_provider.dart';
 import 'package:rmutp_campus_app/screens/exam_schedule_screen.dart';
 import 'package:rmutp_campus_app/screens/grades_screen.dart';
+import 'package:rmutp_campus_app/screens/profile_screen.dart';
 import 'package:rmutp_campus_app/screens/timetable_screen.dart';
 import 'package:rmutp_campus_app/screens/transcript_screen.dart';
 import 'package:rmutp_campus_app/services/database_service.dart';
@@ -223,7 +225,7 @@ void main() {
       ),
     ];
 
-    test('buildSemesters จัด_group ตาม term_label และคำนวณ GPA แบบถ่วงน้ำหนัก', () {
+    test('buildSemesters จัดกลุ่มตาม term_label และคำนวณ GPA แบบถ่วงน้ำหนัก', () {
       final semesters = buildSemesters(grades);
 
       expect(semesters, hasLength(2));
@@ -247,6 +249,105 @@ void main() {
       expect(semesters.first.totalCredits, 6);
       expect(semesters.first.gpa, '3.75');
       expect(semesters.first.courses.first.code, 'ENGCE301');
+    });
+  });
+
+  group('ข้อมูลบัตรนักศึกษาจาก DB', () {
+    StudentDeepProfile makeProfile({
+      String studentId = '650602001',
+      String fullNameTh = 'มินตรา ใจดี',
+      String facultyNameTh = 'คณะวิศวกรรมศาสตร์',
+      String departmentNameTh = 'วิศวกรรมคอมพิวเตอร์',
+    }) {
+      return StudentDeepProfile(
+        studentId: studentId,
+        fullNameTh: fullNameTh,
+        fullNameEn: 'Mintra Jaidee',
+        universityEmail: 's650602001@rmutp.ac.th',
+        citizenId: '1-xxxx-xxxxx-xx-x',
+        birthDate: '14 พ.ค. 2547',
+        bloodGroup: 'O',
+        facultyNameTh: facultyNameTh,
+        campus: 'กรุงเทพมหานคร',
+        departmentNameTh: departmentNameTh,
+        degreeNameTh: 'วศ.บ.',
+        yearLevel: 2,
+        gpax: 3.42,
+        currentTermGpa: 3.55,
+        creditsProgressLabel: '87/132',
+        advisorName: 'อ.ดร. ธนกร วัฒนกุล',
+        phone: '092-345-6789',
+        lineId: 'mintra_ce65',
+        currentAddress: '-',
+        permanentAddress: '-',
+        emergencyContactName: 'นางสมศรี ใจดี',
+        emergencyContactRelation: 'มารดา',
+        emergencyContactPhone: '081-999-8877',
+      );
+    }
+
+    test('ชื่อ/รหัสมาจาก session ที่ล็อกอิน คณะ-สาขมาจาก deep profile', () {
+      final db = AppDatabaseProvider();
+      db.currentUser = AuthenticatedUserSession(
+        email: 's650602001@rmutp.ac.th',
+        role: 'student',
+        studentId: '650602001',
+        displayName: 'มินตรา',
+        subtitleInfo: 'วศ.บ. วิศวกรรมคอมพิวเตอร์',
+      );
+      db.studentProfile = makeProfile();
+
+      final info = buildStudentCardInfo(db);
+
+      expect(info.displayName, 'มินตรา');
+      expect(info.studentId, '650602001');
+      expect(info.faculty, 'คณะวิศวกรรมศาสตร์');
+      expect(info.major, 'วิศวกรรมคอมพิวเตอร์');
+      expect(info.displayName, isNot('Theerachut'));
+      expect(info.studentId, isNot('65012345678-9'));
+    });
+
+    test('ไม่มี session ให้ fallback เป็นชื่อ/รหัสจาก deep profile', () {
+      final db = AppDatabaseProvider()
+        ..studentProfile = makeProfile(studentId: '650602002', fullNameTh: 'ภูริ พัฒนากุล');
+
+      final info = buildStudentCardInfo(db);
+
+      expect(info.displayName, 'ภูริ พัฒนากุล');
+      expect(info.studentId, '650602002');
+    });
+
+    test('ไม่มีข้อมูลเลยต้องแสดง - ไม่ใช่ค่าที่ฝังไว้', () {
+      final info = buildStudentCardInfo(AppDatabaseProvider());
+
+      expect(info.displayName, '-');
+      expect(info.studentId, '-');
+      expect(info.faculty, '-');
+      expect(info.major, '-');
+    });
+
+    testWidgets('หน้าบัตรนักศึกษาแสดงชื่อ/รหัสจาก provider', (tester) async {
+      final db = AppDatabaseProvider();
+      db.currentUser = AuthenticatedUserSession(
+        email: 's650602001@rmutp.ac.th',
+        role: 'student',
+        studentId: '650602001',
+        displayName: 'มินตรา',
+        subtitleInfo: 'วศ.บ. วิศวกรรมคอมพิวเตอร์',
+      );
+      db.studentProfile = makeProfile();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [ChangeNotifierProvider<AppDatabaseProvider>.value(value: db)],
+          child: const MaterialApp(home: ProfileScreen()),
+        ),
+      );
+
+      expect(find.text('มินตรา'), findsOneWidget);
+      expect(find.text('650602001'), findsNWidgets(2));
+      expect(find.text('Theerachut'), findsNothing);
+      expect(find.text('65012345678-9'), findsNothing);
     });
   });
 }

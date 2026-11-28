@@ -204,7 +204,7 @@ flutter build web
 | มีไฟล์โลโก้ซ้ำใน `lib/assets/images/` | คopi UI ต้นฉบับเข้ามาแล้วไม่ได้ใช้ | ลบออก เหลือเฉพาะ `assets/images/rmutp_logo.png` ที่ประกาศใน pubspec |
 
 ### ผลการตรวจสอบ
-- `flutter test` → **59 tests passed**
+- `flutter test` → **63 tests passed**
 - `flutter analyze` → **No issues found**
 - `google_fonts` ยังล็อกอยู่ที่ **8.2.1** (ห้าม upgrade เป็น 9.x เพราะจะเกิด error `TextTheme`)
 
@@ -222,7 +222,8 @@ flutter build web
 - `exam_schedule_screen.dart`: ใช้ `db.examEvents` จาก `academic_calendar_events` (`event_type='exam'`) แทนตารางสอบที่ฝังไว้; แยกกลางภาค/ปลายภาคจากชื่อ event
 - โมเดลใหม่: `attendance_summary.dart`, `exam_event.dart`; ขยาย `GradeItem` ด้วย `credits/termLabel/isCurrent` และ `NotificationItem` ด้วย `isRead/createdAt`
 - ทุกหน้าเมื่อไม่มีข้อมูลจาก DB จะแสดง empty state แทนข้อมูลตัวอย่าง และ `logout()` ล้างข้อมูลใหม่ทั้งหมด
-- **Unit test ใหม่**: `test/unit/database_driven_data_test.dart` ครอบคลุม mapper ของ `v_student_grades`, การคำนวณ GPA, `hoursFromTime`, `AttendanceCourseSummary`, การแยก event สอบ, และ provider (mark-read / logout)
+- `profile_screen.dart` (บัตรนักศึกษา): ลบค่าที่ฝังไว้ `Theerachut / 65012345678-9 / Faculty of Engineering / Computer Engineering / 31 MAY 2027` เปลี่ยนเป็น `buildStudentCardInfo()` ที่อ่านจาก `currentUser` + `studentProfile` (รหัสใช้ทั้งบัตรและ barcode); แถบ "VALID UNTIL" ที่ไม่มีข้อมูลใน DB ถูกลบออก
+- **Unit test ใหม่**: `test/unit/database_driven_data_test.dart` ครอบคลุม mapper ของ `v_student_grades`, การคำนวณ GPA, `hoursFromTime`, `AttendanceCourseSummary`, การแยก event สอบ, ข้อมูลบัตรนักศึกษา (unit + widget test), และ provider (mark-read / logout)
 
 ### ปัญหาที่พบ และวิธีแก้
 | ปัญหาที่เจอ | สาเหตุ | วิธีแก้ |
@@ -232,7 +233,7 @@ flutter build web
 | ตาราง `academic_calendar_events` ไม่มีห้องสอบ/เลขที่นั่งรายวิชา | schema เก็บแค่ event ระดับสัปดาห์ (`date_display`, `description`) | แสดงเฉพาะข้อมูลที่มีจริงใน DB; ช่องที่ไม่มีแสดง `-` และไม่สร้างข้อมูลขึ้นเอง |
 
 ### ผลการตรวจสอบ (รอบนี้)
-- `flutter test --reporter compact` → **59 tests passed**
+- `flutter test --reporter compact` → **63 tests passed**
 - `flutter analyze` → **No issues found**
 
 ## เอกสารอ้างอิง

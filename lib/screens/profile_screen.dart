@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_database_provider.dart';
 
 const Color _kBg = Color(0xFFF7F6FA);
 const Color _kPrimary = Color(0xFF4A148C);
@@ -33,6 +35,33 @@ TextStyle _inter(
       letterSpacing: letterSpacing,
     );
 
+/// ข้อมูลที่ใช้แสดงบนบัตรนักศึกษา — ดึงจาก session + deep profile เท่านั้น
+class StudentCardInfo {
+  final String displayName;
+  final String studentId;
+  final String faculty;
+  final String major;
+
+  const StudentCardInfo({
+    required this.displayName,
+    required this.studentId,
+    this.faculty = '-',
+    this.major = '-',
+  });
+}
+
+StudentCardInfo buildStudentCardInfo(AppDatabaseProvider db) {
+  final user = db.currentUser;
+  final profile = db.studentProfile;
+
+  return StudentCardInfo(
+    displayName: user?.displayName ?? profile?.fullNameTh ?? '-',
+    studentId: user?.studentId ?? profile?.studentId ?? '-',
+    faculty: profile?.facultyNameTh ?? '-',
+    major: profile?.departmentNameTh ?? profile?.degreeNameTh ?? '-',
+  );
+}
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -45,6 +74,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final db = context.watch<AppDatabaseProvider>();
+    final info = buildStudentCardInfo(db);
+
     return Scaffold(
       backgroundColor: _kBg,
       appBar: _buildHeader(context, 'บัตรนักศึกษา'),
@@ -54,9 +86,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
           child: Column(
             children: [
-              const _StudentIdCard(),
+              _StudentIdCard(info: info),
               const SizedBox(height: 20),
-              const _CampusAccessCard(),
+              _CampusAccessCard(studentId: info.studentId),
               const SizedBox(height: 16),
               _BrightnessControlCard(
                 value: _highBrightness,
@@ -127,7 +159,9 @@ class _BackChevronPainter extends CustomPainter {
 }
 
 class _StudentIdCard extends StatelessWidget {
-  const _StudentIdCard();
+  final StudentCardInfo info;
+
+  const _StudentIdCard({required this.info});
 
   @override
   Widget build(BuildContext context) {
@@ -222,12 +256,12 @@ class _StudentIdCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 22),
                     Text(
-                      'Theerachut',
+                      info.displayName,
                       style: _inter(22, FontWeight.w600, _kInk),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '65012345678-9',
+                      info.studentId,
                       style: _inter(15, FontWeight.w500, _kPrimary),
                     ),
                     const SizedBox(height: 15),
@@ -244,7 +278,7 @@ class _StudentIdCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Faculty of Engineering',
+                      info.faculty,
                       style: _inter(14, FontWeight.w500, _kInk),
                     ),
                     const SizedBox(height: 11),
@@ -259,30 +293,10 @@ class _StudentIdCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Computer Engineering',
+                      info.major,
                       style: _inter(14, FontWeight.w500, _kInk),
                     ),
-                    const SizedBox(height: 11),
-                    const Divider(height: 1, thickness: 1, color: _kDivider),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'VALID UNTIL',
-                          style: _inter(
-                            9,
-                            FontWeight.w600,
-                            _kMuted,
-                            letterSpacing: 0.4,
-                          ),
-                        ),
-                        Text(
-                          '31 MAY 2027',
-                          style: _inter(11, FontWeight.w600, _kPrimary),
-                        ),
-                      ],
-                    ),
+                    const SizedBox(height: 4),
                   ],
                 ),
               ),
@@ -315,7 +329,9 @@ class _StudentIdCard extends StatelessWidget {
 }
 
 class _CampusAccessCard extends StatelessWidget {
-  const _CampusAccessCard();
+  final String studentId;
+
+  const _CampusAccessCard({required this.studentId});
 
   @override
   Widget build(BuildContext context) {
@@ -353,7 +369,7 @@ class _CampusAccessCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '65012345678-9',
+                      studentId,
                       style: _inter(12, FontWeight.w500, _kInk),
                     ),
                     const SizedBox(height: 16),
@@ -480,7 +496,7 @@ class _BrightnessControlCard extends StatelessWidget {
 class _BarcodePainter extends CustomPainter {
   const _BarcodePainter();
 
-  // Code 128-style bar/space widths for "65012345678-9"
+  // Code 128-style bar/space widths (ลายที่ใช้แสดงผลเท่านั้น)
   static const List<int> _pattern = [
     2, 1, 1, 4, 1, 2, 1, 2, 2, 1, 3, 1, 1, 1, 2, 2,
     3, 1, 2, 1, 1, 3, 1, 2, 2, 2, 1, 1, 2, 1, 3, 1,
