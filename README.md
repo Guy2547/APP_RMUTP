@@ -236,6 +236,34 @@ flutter build web
 - `flutter test --reporter compact` → **63 tests passed**
 - `flutter analyze` → **No issues found**
 
+## 🆕 รอบ work ล่าสุด: แก้ชื่อในบัตรนักศึกษาไม่ตรงกับผู้ล็อกอิน
+
+### สิ่งที่ทำเพิ่ม
+- `lib/screens/profile_screen.dart`: เปลี่ยนหน้า "บัตรนักศึกษา" จากข้อมูลที่ฝังไว้ในโค้ดมาเป็นข้อมูลจากฐานข้อมูลทั้งหมด
+  - **ชื่อ**: `currentUser.displayName` → fallback `studentProfile.fullNameTh`
+  - **รหัสนักศึกษา**: `currentUser.studentId` (ใช้ทั้งบนบัตรและป้ายใต้ barcode)
+  - **คณะ/สาขา**: `studentProfile.facultyNameTh` / `departmentNameTh`
+  - เพิ่ม `StudentCardInfo` + `buildStudentCardInfo(AppDatabaseProvider db)` เป็น mapper กลาง เพื่อให้เขียนเทสได้และไม่กระจายการอ่าน provider หลายจุด
+  - หน้าถูกเปลี่ยนเป็น `context.watch<AppDatabaseProvider>()` จึงอัปเดตทันทีหลังล็อกอิน/รีเฟรช/ออกจากระบบ
+- `test/unit/database_driven_data_test.dart`: เพิ่ม 4 เทสใหม่
+  - mapper อ่านค่าจาก session + deep profile
+  - fallback ชื่อ/รหัสจาก `studentProfile` เมื่อยังไม่มี session
+  - ไม่มีข้อมูลเลยต้องได้ `-` (ไม่ใช่ค่าตัวอย่าง)
+  - **widget test** pump `ProfileScreen` พร้อม provider ตรวจว่าเห็นชื่อ/รหัสจาก DB และไม่เหลือ `Theerachut` / `65012345678-9`
+
+### ปัญหาที่เจอ และวิธีแก้
+| ปัญหาที่เจอ | สาเหตุ | วิธีแก้ |
+|-------------|--------|--------|
+| ชื่อในหน้าบัตรนักศึกษาไม่ตรงกับชื่อผู้ใช้ (หน้าแรก/ทรานสคริปต์) | หน้าอื่นอ่าน `currentUser` จาก DB แต่ `profile_screen.dart` ยังฝังค่าตัวอย่างไว้ตั้งแต่พอร์ต UI: `Theerachut`, `65012345678-9`, `Faculty of Engineering`, `Computer Engineering` | ใช้ mapper `buildStudentCardInfo()` อ่านจาก provider เพียงแหล่งเดียว; ลบค่าคงที่ทั้งหมดและใช้รหัสตัวเดียวกันทั้งบัตรและ barcode |
+| แถบ "VALID UNTIL / 31 MAY 2027" ไม่มีอยู่ใน schema | มาจาก UI ต้นฉบับ ไม่มีคอลัมน์วันหมดอายุในตาราง `students` หรือ `academic_terms` ที่โหลดอยู่ใน provider | ลบแถวนี้ออกแทนการเดาวันจากที่อื่น (ไม่สร้างข้อมูลที่ไม่มีใน DB) |
+| ไม่สามารถอ่านภาพที่ผู้ใช้แนบมาเพื่อชี้ตำแหน่งปัญหาได้ | โมเดลที่ใช้ในเซสชันไม่รองรับ image input | ให้ผู้ใช้ระบุเป็นข้อความว่า "ชื่อนักศึกษากับหน้าบัตรไม่ตรงกัน" แล้วสแกนโค้ดหาค่าที่ฝังไว้จนเจอสาเหตุ; แนะนำโมเดลที่รองรับภาพ (Gemini/Claude/GPT-5/6) สำหรับการตรวจภาพในรอบถัดไป |
+| ต้องการให้เทสครอบคลุมไม่ใช่แค่ mapper | mapper อย่างเดียวไม่รับประกันว่าหน้าได้ provider ถูกต้อง | เพิ่ม widget test พร้อม `MultiProvider` ตรวจผลลัพธ์บนหน้าจอจริง |
+
+### ผลการตรวจสอบ (รอบนี้)
+- `flutter analyze` → **No issues found**
+- `flutter test --reporter compact` → **63 tests passed**
+- Commit `e2802a5` ถูก push ขึ้น `master` แล้ว (รอบนี้เขียน README เพิ่มและ push อีกครั้ง)
+
 ## เอกสารอ้างอิง
 
 - `SESSION_SUMMARY.md` — บันทึกเซสชันแก้ไขก่อนหน้า (ปัญหา Gradle, java_home, google_fonts เวอร์ชัน ฯลฯ)
