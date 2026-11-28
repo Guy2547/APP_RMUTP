@@ -6,68 +6,34 @@ import '../models/request_item.dart';
 import '../models/subject.dart';
 import '../services/database_config.dart';
 import '../services/database_service.dart';
-import '../services/mock_data.dart';
 
 class AppDatabaseProvider extends ChangeNotifier {
   bool isLoading = false;
   String? lastError;
 
-  // ข้อมูลผู้ใช้งานที่เข้าสู่ระบบปัจจุบัน (ค่าเริ่มต้นสำหรับการเปิดหน้าจอโดยตรงในการทดสอบ)
-  AuthenticatedUserSession currentUser = AuthenticatedUserSession(
-    email: 's650602001@rmutp.ac.th',
-    role: 'student',
-    studentId: '650602001',
-    displayName: 'น.ส.มินตรา ใจดี',
-    subtitleInfo: '650602001 • วิศวกรรมคอมพิวเตอร์ ปี 2',
-    gpax: 3.42,
-    currentTermGpa: 3.55,
-    earnedCredits: 87,
-    totalCreditsRequired: 132,
-  );
+  // ข้อมูลผู้ใช้งานที่เข้าสู่ระบบปัจจุบัน (เริ่มต้นเป็น null จนกว่าจะล็อกอินสำเร็จ)
+  AuthenticatedUserSession? currentUser;
 
   StudentDeepProfile? studentProfile;
   List<FinancialReceiptRecord> financialRecords = [];
 
-  List<Subject> studentTimetable = List<Subject>.from(MockData.timetableStudent);
-  List<Subject> teacherTimetable = List<Subject>.from(MockData.timetableTeacher);
+  List<Subject> studentTimetable = [];
+  List<Subject> teacherTimetable = [];
 
-  List<GradeItem> studentGrades = List<GradeItem>.from(MockData.gradesStudent);
-  List<StudentRow> teacherGradeRows = List<StudentRow>.from(
-    MockData.gradeSubmitRows.map(
-      (r) => StudentRow(
-        id: r.id,
-        name: r.name,
-        midterm: r.midterm,
-        finalExam: r.finalExam,
-        coursework: r.coursework,
-        status: r.status,
-      ),
-    ),
-  );
+  List<GradeItem> studentGrades = [];
+  List<StudentRow> teacherGradeRows = [];
 
   bool isAttendanceRoomOpen = true;
   String? attachedHomeworkFile;
   bool isHomeworkSubmitted = false;
 
-  List<AttendanceRecordItem> attendanceRecords = [
-    AttendanceRecordItem(studentId: '650602001', studentName: 'น.ส.มินตรา ใจดี', status: 'present', checkInTime: '09:03'),
-    AttendanceRecordItem(studentId: '650602002', studentName: 'นายภูริ พัฒนากุล', status: 'present', checkInTime: '09:04'),
-    AttendanceRecordItem(studentId: '650602003', studentName: 'น.ส.กันยา รัตนโชติ', status: 'absent'),
-    AttendanceRecordItem(studentId: '650602004', studentName: 'นายธนภัทร ศรีสุวรรณ', status: 'present', checkInTime: '09:01'),
-    AttendanceRecordItem(studentId: '650602005', studentName: 'น.ส.พิมชนก วงศ์สวัสดิ์', status: 'present', checkInTime: '09:02'),
-    AttendanceRecordItem(studentId: '650602006', studentName: 'นายณัฐวุฒิ เจริญสุข', status: 'late', checkInTime: '09:18'),
-    AttendanceRecordItem(studentId: '650602007', studentName: 'น.ส.ชลธิชา อภิรักษ์', status: 'present', checkInTime: '09:05'),
-    AttendanceRecordItem(studentId: '650602008', studentName: 'นายศุภกร เกียรติคุณ', status: 'absent'),
-    AttendanceRecordItem(studentId: '650602009', studentName: 'น.ส.ปภาวรินท์ เลิศสกุล', status: 'present', checkInTime: '09:00'),
-    AttendanceRecordItem(studentId: '650602010', studentName: 'นายกิตติพัฒน์ ธนากุล', status: 'absent'),
-    AttendanceRecordItem(studentId: '650602011', studentName: 'น.ส.ณัฐณิชา พงศ์ไพบูลย์', status: 'present', checkInTime: '09:06'),
-    AttendanceRecordItem(studentId: '650602012', studentName: 'นายภัทรพล อัศวเมธี', status: 'present', checkInTime: '09:07'),
-  ];
+  // ข้อมูลเช็กชื่อจะถูกโหลดจากฐานข้อมูลเท่านั้น — ไม่เก็บข้อมูลตัวอย่างไว้ในแอป
+  List<AttendanceRecordItem> attendanceRecords = [];
 
-  List<RequestItem> allRequests = List<RequestItem>.from(MockData.requestsStudent);
-  List<NewsItem> newsList = List<NewsItem>.from(MockData.newsList);
-  List<NotificationItem> notifications = List<NotificationItem>.from(MockData.notifications);
-  List<String> academicCalendar = List<String>.from(MockData.academicCalendar);
+  List<RequestItem> allRequests = [];
+  List<NewsItem> newsList = [];
+  List<NotificationItem> notifications = [];
+  List<String> academicCalendar = [];
 
   DatabaseBackendMode get backendMode => DatabaseConfig.currentMode;
 
@@ -130,10 +96,38 @@ class AppDatabaseProvider extends ChangeNotifier {
     return session;
   }
 
+  /// ออกจากระบบ: ล้าง session และข้อมูลทั้งหมดที่โหลดไว้สำหรับผู้ใช้คนก่อน
+  /// เพื่อไม่ให้ข้อมูลนักศึกษายังvisibleอยู่หลังกลับไปหน้า login
+  void logout() {
+    currentUser = null;
+    studentProfile = null;
+    financialRecords = [];
+    studentTimetable = [];
+    teacherTimetable = [];
+    studentGrades = [];
+    teacherGradeRows = [];
+    attendanceRecords = [];
+    allRequests = [];
+    newsList = [];
+    notifications = [];
+    academicCalendar = [];
+    isAttendanceRoomOpen = true;
+    attachedHomeworkFile = null;
+    isHomeworkSubmitted = false;
+    lastError = null;
+    isLoading = false;
+    notifyListeners();
+  }
+
   /// โหลดข้อมูลทั้งหมดจากฐานข้อมูลตามผู้ใช้งานปัจจุบัน
   Future<void> refreshAllData() async {
-    final stuId = currentUser.studentId ?? '650602001';
-    final tchId = currentUser.teacherId ?? 'T-1024';
+    final stuId = currentUser?.studentId ?? '';
+    final tchId = currentUser?.teacherId ?? '';
+
+    if (stuId.isEmpty && tchId.isEmpty) {
+      lastError = 'ยังไม่ได้ล็อกอิน';
+      return;
+    }
 
     studentProfile = await DatabaseService.fetchStudentDeepProfile(stuId);
     financialRecords = await DatabaseService.fetchFinancialRecords(stuId);
@@ -183,7 +177,7 @@ class AppDatabaseProvider extends ChangeNotifier {
 
   /// รายการคำร้องสำหรับนักศึกษาที่ล็อกอินอยู่
   List<RequestItem> get studentRequests {
-    final stuId = currentUser.studentId ?? '650602001';
+    final stuId = currentUser?.studentId ?? '';
     final list = allRequests.where((r) => r.studentId == stuId).toList();
     return list.isNotEmpty ? list : allRequests;
   }
@@ -203,7 +197,7 @@ class AppDatabaseProvider extends ChangeNotifier {
     required String subjectCode,
     required bool submitFinal,
   }) async {
-    final tchId = currentUser.teacherId;
+    final tchId = currentUser?.teacherId;
     if (tchId == null) {
       lastError = 'เฉพาะอาจารย์ที่ล็อกอินเท่านั้นที่ส่งเกรดได้';
       notifyListeners();
@@ -225,7 +219,11 @@ class AppDatabaseProvider extends ChangeNotifier {
 
   /// นักศึกษากดเช็กชื่อเข้าเรียน
   Future<String> checkInCurrentStudent() async {
-    final stuId = currentUser.studentId ?? '650602001';
+    final stuId = currentUser?.studentId ?? '';
+    if (stuId.isEmpty) {
+      lastError = 'ยังไม่ได้ล็อกอิน';
+      return '';
+    }
     final now = TimeOfDay.now();
     final formattedTime =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
@@ -268,7 +266,11 @@ class AppDatabaseProvider extends ChangeNotifier {
   }
 
   Future<void> submitHomeworkFile() async {
-    final stuId = currentUser.studentId ?? '650602001';
+    final stuId = currentUser?.studentId ?? '';
+    if (stuId.isEmpty) {
+      lastError = 'ยังไม่ได้ล็อกอิน';
+      return;
+    }
     final file = attachedHomeworkFile ?? '${stuId}_HW6_ER_3NF.pdf';
     attachedHomeworkFile = file;
     isHomeworkSubmitted = true;
@@ -282,7 +284,11 @@ class AppDatabaseProvider extends ChangeNotifier {
     required String title,
     required String description,
   }) async {
-    final stuId = currentUser.studentId ?? '650602001';
+    final stuId = currentUser?.studentId ?? '';
+    if (stuId.isEmpty) {
+      lastError = 'ยังไม่ได้ล็อกอิน';
+      throw Exception('ยังไม่ได้ล็อกอิน');
+    }
     final created = await DatabaseService.createServiceRequest(
       studentId: stuId,
       category: category,
@@ -320,7 +326,11 @@ class AppDatabaseProvider extends ChangeNotifier {
     required String type,
     required String detail,
   }) async {
-    final tchId = currentUser.teacherId ?? 'T-1024';
+    final tchId = currentUser?.teacherId ?? '';
+    if (tchId.isEmpty) {
+      lastError = 'ยังไม่ได้ล็อกอินในฐานะอาจารย์';
+      return;
+    }
     final created = await DatabaseService.createNewsAnnouncement(
       title: title,
       type: type,

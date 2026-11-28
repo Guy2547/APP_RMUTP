@@ -1,8 +1,128 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/app_database_provider.dart';
-import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart' show bottomPadding;
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+const Color _kBg = Color(0xFFF7F6FA);
+const Color _kPrimary = Color(0xFF4A148C);
+const Color _kInk = Color(0xFF21172F);
+const Color _kMuted = Color(0xFF756B80);
+const Color _kOnPrimaryMuted = Color(0xFFE5D6F8);
+const Color _kSummaryDivider = Color(0xFF703DA6);
+const Color _kSelectorBorder = Color(0xFFE7DFEE);
+
+TextStyle _thai(double size, FontWeight weight, Color color) =>
+    GoogleFonts.notoSansThai(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      height: 1.4,
+    );
+
+TextStyle _inter(double size, FontWeight weight, Color color) =>
+    GoogleFonts.inter(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      height: 1.4,
+    );
+
+class _CourseResult {
+  final String code;
+  final String name;
+  final int credits;
+  final String grade;
+
+  const _CourseResult({
+    required this.code,
+    required this.name,
+    required this.credits,
+    required this.grade,
+  });
+}
+
+class _SemesterData {
+  final String label;
+  final String gpa;
+  final List<_CourseResult> courses;
+
+  const _SemesterData({
+    required this.label,
+    required this.gpa,
+    required this.courses,
+  });
+
+  int get totalCredits =>
+      courses.fold<int>(0, (sum, item) => sum + item.credits);
+}
+
+const List<_SemesterData> _semesters = [
+  _SemesterData(
+    label: 'ภาคเรียนที่ 1/2569',
+    gpa: '4.00',
+    courses: [
+      _CourseResult(
+        code: '040203201',
+        name: 'การเขียนโปรแกรมเชิงวัตถุ',
+        credits: 3,
+        grade: 'A',
+      ),
+      _CourseResult(
+        code: '040203202',
+        name: 'ระบบฐานข้อมูล',
+        credits: 3,
+        grade: 'A',
+      ),
+      _CourseResult(
+        code: '040203203',
+        name: 'เครือข่ายคอมพิวเตอร์',
+        credits: 3,
+        grade: 'A',
+      ),
+      _CourseResult(
+        code: '040203204',
+        name: 'ระบบปฏิบัติการ',
+        credits: 3,
+        grade: 'A',
+      ),
+      _CourseResult(
+        code: '040203205',
+        name: 'วิศวกรรมซอฟต์แวร์',
+        credits: 3,
+        grade: 'A',
+      ),
+    ],
+  ),
+  _SemesterData(
+    label: 'ภาคเรียนที่ 2/2568',
+    gpa: '3.88',
+    courses: [
+      _CourseResult(
+        code: '040203105',
+        name: 'โครงสร้างข้อมูลและอัลกอริทึม',
+        credits: 3,
+        grade: 'A',
+      ),
+      _CourseResult(
+        code: '040203106',
+        name: 'สถาปัตยกรรมคอมพิวเตอร์',
+        credits: 3,
+        grade: 'A',
+      ),
+      _CourseResult(
+        code: '040203107',
+        name: 'คณิตศาสตร์ดิสครีต',
+        credits: 3,
+        grade: 'B+',
+      ),
+      _CourseResult(
+        code: '010101102',
+        name: 'ภาษาอังกฤษเพื่อการสื่อสาร',
+        credits: 3,
+        grade: 'A',
+      ),
+    ],
+  ),
+];
 
 class GradesScreen extends StatefulWidget {
   const GradesScreen({super.key});
@@ -12,275 +132,366 @@ class GradesScreen extends StatefulWidget {
 }
 
 class _GradesScreenState extends State<GradesScreen> {
-  String _selectedTerm = 'ภาคเรียนที่ 1/2569';
+  int _selectedSemesterIndex = 0;
 
-  final List<String> _terms = [
-    'ภาคเรียนที่ 1/2569',
-    'ภาคเรียนที่ 2/2568',
-    'ภาคเรียนที่ 1/2568',
-  ];
+  void _showSemesterPicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int i = 0; i < _semesters.length; i++)
+                  ListTile(
+                    title: Text(
+                      _semesters[i].label,
+                      style: _thai(
+                        15,
+                        i == _selectedSemesterIndex
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        i == _selectedSemesterIndex ? _kPrimary : _kInk,
+                      ),
+                    ),
+                    trailing: i == _selectedSemesterIndex
+                        ? const Icon(Icons.check_rounded, color: _kPrimary)
+                        : null,
+                    onTap: () {
+                      setState(() => _selectedSemesterIndex = i);
+                      Navigator.pop(context);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final db = context.watch<AppDatabaseProvider>();
-    final user = db.currentUser;
+    final semester = _semesters[_selectedSemesterIndex];
 
     return Scaffold(
-      backgroundColor: kBg,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('ผลการเรียน',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kDark),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding(context)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Term selector
-            Row(
-              children: [
-                Text(
-                  'เลือกภาคเรียน',
-                  style: AppText.kanit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
+      backgroundColor: _kBg,
+      appBar: _buildHeader(context, 'ผลการเรียน'),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _AcademicSummaryCard(semesterGpa: semester.gpa),
+              const SizedBox(height: 20),
+              _SemesterSelector(
+                label: semester.label,
+                onTap: _showSemesterPicker,
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    'รายวิชา',
+                    style: _thai(17, FontWeight.w600, _kInk),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: kDark,
-                    borderRadius: BorderRadius.circular(20),
+                  Text(
+                    '${semester.courses.length} วิชา · ${semester.totalCredits} หน่วยกิต',
+                    style: _thai(11, FontWeight.w400, _kMuted),
                   ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedTerm,
-                      items: _terms
-                          .map((t) => DropdownMenuItem(
-                                value: t,
-                                child: Text(
-                                  t,
-                                  style: AppText.kanit(
-                                    fontSize: 12,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ))
-                          .toList(),
-                      onChanged: (v) => setState(() => _selectedTerm = v!),
-                      dropdownColor: kDark,
-                      style: AppText.kanit(
-                        fontSize: 12,
-                        color: Colors.white,
-                      ),
-                      icon: const Icon(
-                        Icons.keyboard_arrow_down,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              for (int i = 0; i < semester.courses.length; i++) ...[
+                if (i > 0) const SizedBox(height: 8),
+                _CourseGradeCard(course: semester.courses[i]),
               ],
-            ),
-            const SizedBox(height: 20),
-
-            // GPA card
-            AppCard(
-              color: kDark,
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Text(
-                    'GPA สะสม (${user.displayName})',
-                    style: AppText.kanit(
-                      fontSize: 12,
-                      color: Colors.purple.shade200,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        user.gpax.toStringAsFixed(2),
-                        style: const TextStyle(
-                          color: kGold,
-                          fontSize: 48,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        children: [
-                          Text(
-                            'เทอมนี้',
-                            style: AppText.kanit(
-                              fontSize: 11,
-                              color: Colors.purple.shade200,
-                            ),
-                          ),
-                          Text(
-                            user.currentTermGpa.toStringAsFixed(2),
-                            style: AppText.kanit(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: kGold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'หน่วยกิตสะสม ${user.earnedCredits}/${user.totalCreditsRequired} • เกรดเฉลี่ยภาคเรียน ${user.currentTermGpa.toStringAsFixed(2)}',
-                    style: AppText.kanit(
-                      fontSize: 11,
-                      color: Colors.purple.shade200,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Subject grades list
-            Text(
-              'รายวิชาที่ลงทะเบียน',
-              style: AppText.kanit(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: kDark,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ...db.studentGrades.map((g) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: AppCard(
-                  color: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: _gradeColor(g.score).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Center(
-                          child: Text(
-                            g.letter.split(' ').first,
-                            style: TextStyle(
-                              color: _gradeColor(g.score),
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${g.subjectCode} ${g.subjectName}',
-                              style: AppText.kanit(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: kDark,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: g.isWarning
-                                        ? Colors.amber.withValues(alpha: 0.1)
-                                        : Colors.green.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    g.isWarning ? 'ต้องปรับปรุง' : 'ผ่านเกณฑ์',
-                                    style: AppText.kanit(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w600,
-                                      color: g.isWarning
-                                          ? Colors.amber.shade700
-                                          : Colors.green.shade700,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${g.score.toStringAsFixed(1)} / 4.00',
-                                  style: AppText.kanit(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (g.isWarning) ...[
-                        const Icon(Icons.warning_amber, color: Colors.amber, size: 20),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: 20),
-            AppCard(
-              color: Colors.amber.withValues(alpha: 0.05),
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.amber, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'เกรดคำนวณอัตโนมัติผ่านระบบฐานข้อมูล (PostgreSQL Trigger)',
-                      style: AppText.kanit(
-                        fontSize: 11,
-                        color: Colors.amber.shade800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
 
-  Color _gradeColor(double score) {
-    if (score >= 3.5) return Colors.green.shade600;
-    if (score >= 3.0) return Colors.green.shade500;
-    if (score >= 2.5) return Colors.amber.shade600;
-    if (score >= 2.0) return Colors.orange.shade600;
-    return Colors.red.shade600;
+PreferredSizeWidget _buildHeader(BuildContext context, String title) {
+  return AppBar(
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.white,
+    elevation: 0,
+    scrolledUnderElevation: 0,
+    toolbarHeight: 50,
+    centerTitle: true,
+    systemOverlayStyle: SystemUiOverlayStyle.dark,
+    leadingWidth: 64,
+    leading: Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16),
+        child: InkWell(
+          onTap: () => Navigator.pop(context),
+          borderRadius: BorderRadius.circular(20),
+          child: const Padding(
+            padding: EdgeInsets.all(8),
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CustomPaint(painter: _BackChevronPainter()),
+            ),
+          ),
+        ),
+      ),
+    ),
+    title: Text(title, style: _thai(21, FontWeight.w600, _kInk)),
+  );
+}
+
+class _BackChevronPainter extends CustomPainter {
+  const _BackChevronPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 28, size.height / 28);
+    final paint = Paint()
+      ..color = _kPrimary
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path()
+      ..moveTo(17, 6)
+      ..lineTo(9, 14)
+      ..lineTo(17, 22);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _AcademicSummaryCard extends StatelessWidget {
+  final String semesterGpa;
+
+  const _AcademicSummaryCard({required this.semesterGpa});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
+      decoration: BoxDecoration(
+        color: _kPrimary,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: _kPrimary.withValues(alpha: 0.12),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'เกรดเฉลี่ยสะสม (GPAX)',
+                style: _thai(13, FontWeight.w500, _kOnPrimaryMuted),
+              ),
+              Text(
+                'RMUTP',
+                style: _inter(11, FontWeight.w600, _kOnPrimaryMuted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '3.90',
+            style: GoogleFonts.inter(
+              fontSize: 44,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1, thickness: 1, color: _kSummaryDivider),
+          const SizedBox(height: 13),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'เกรดเฉลี่ยภาคเรียน (GPA)',
+                      style: _thai(10.5, FontWeight.w400, _kOnPrimaryMuted),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      semesterGpa,
+                      style: _inter(22, FontWeight.w600, Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 34,
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                color: _kSummaryDivider,
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'หน่วยกิตสะสม',
+                      style: _thai(10.5, FontWeight.w400, _kOnPrimaryMuted),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          '96',
+                          style: _inter(22, FontWeight.w600, Colors.white),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'หน่วยกิต',
+                          style: _thai(11, FontWeight.w400, _kOnPrimaryMuted),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SemesterSelector extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _SemesterSelector({
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          height: 56,
+          padding: const EdgeInsets.symmetric(horizontal: 17),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _kSelectorBorder, width: 1),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: _thai(15, FontWeight.w500, _kInk)),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 24,
+                color: _kPrimary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CourseGradeCard extends StatelessWidget {
+  final _CourseResult course;
+
+  const _CourseGradeCard({required this.course});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 70,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  course.code,
+                  style: _inter(10, FontWeight.w500, _kMuted),
+                ),
+                Text(
+                  course.name,
+                  style: _thai(14, FontWeight.w500, _kInk),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${course.credits} หน่วยกิต',
+                  style: _thai(10, FontWeight.w400, _kMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: _kPrimary,
+              borderRadius: BorderRadius.circular(13),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              course.grade,
+              style: GoogleFonts.inter(
+                fontSize: course.grade.length > 1 ? 16 : 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                height: 1.0,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

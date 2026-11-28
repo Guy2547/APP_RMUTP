@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/grade.dart';
 import '../providers/app_database_provider.dart';
 import '../widgets/app_theme.dart';
+import '../widgets/custom_bottom_nav.dart';
 import '../widgets/grade_card.dart';
 
 class GradeSubmitScreen extends StatefulWidget {
@@ -12,38 +14,39 @@ class GradeSubmitScreen extends StatefulWidget {
 }
 
 class _GradeSubmitScreenState extends State<GradeSubmitScreen> {
-  String _selectedSection = 'ENGCE302 Sec.1 (12 คน)';
+  List<StudentRow> get _rows {
+    final db = context.read<AppDatabaseProvider>();
+    return db.teacherGradeRows;
+  }
 
-  void _submitGrades(AppDatabaseProvider db) {
+  int get _totalCount => _rows.length;
+
+  int get _submittedCount =>
+      context.read<AppDatabaseProvider>().submittedGradeCount;
+
+  void _submitGrades() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ยืนยันส่งเกรดเข้าระบบทะเบียน'),
-        content: Text(
-          'ยืนยันบันทึกคะแนนและตัดเกรดนักศึกษาทั้ง ${db.teacherGradeRows.length} คน ลงในฐานข้อมูล?',
-        ),
+      builder: (_) => AlertDialog(
+        title: const Text('ยืนยันส่งเกรด'),
+        content: const Text('ยืนยันส่งเกรด ENGCE302 Sec.1 เข้าระบบทะเบียน?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => Navigator.pop(context),
             child: const Text('ยกเลิก'),
           ),
           PrimaryButton(
-            text: 'ยืนยันส่งเกรด',
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await db.saveOrSubmitGrades(
-                subjectCode: 'ENGCE302',
-                submitFinal: true,
+            text: 'ยืนยัน',
+            onPressed: () {
+              setState(() {
+                for (var row in _rows) {
+                  row.status = 'ส่งแล้ว';
+                }
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('ส่งเกรดเข้าระบบเรียบร้อย ✅')),
               );
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'อัปเดตคะแนนและตัดเกรดลงตาราง enrollments เรียบร้อย ✅',
-                    ),
-                  ),
-                );
-              }
             },
             backgroundColor: kGold,
             foregroundColor: kDark,
@@ -55,20 +58,12 @@ class _GradeSubmitScreenState extends State<GradeSubmitScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final db = context.watch<AppDatabaseProvider>();
-    final rows = db.teacherGradeRows;
-    final submittedCount = db.submittedGradeCount;
-    final totalCount = rows.isEmpty ? 1 : rows.length;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('👩‍🏫 ตรวจ + ส่งเกรดเข้าระบบ'),
         backgroundColor: kDark,
         foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -79,22 +74,14 @@ class _GradeSubmitScreenState extends State<GradeSubmitScreen> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    initialValue: _selectedSection,
+                    initialValue: 'ENGCE302 Sec.1 (40 คน)',
                     decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 12,
-                      ),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
-                    items: [
-                      'ENGCE302 Sec.1 (12 คน)',
-                      'ENGCE305 Sec.2 (12 คน)',
-                    ]
+                    items: ['ENGCE302 Sec.1 (40 คน)', 'ENGCE305 Sec.2 (38 คน)']
                         .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                         .toList(),
-                    onChanged: (v) {
-                      if (v != null) setState(() => _selectedSection = v);
-                    },
+                    onChanged: (_) {},
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -108,7 +95,7 @@ class _GradeSubmitScreenState extends State<GradeSubmitScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'เทอม 1/2569 • ตัดเกรดอัตโนมัติ (Trigger): A≥80 B+≥75 B≥70 C+≥65 C≥60 D+≥55 D≥50',
+              'เทอม 1/2569 • ตัดเกรด: A≥80 B+≥75 B≥70 C+≥65 C≥60 D+≥55 D≥50',
               style: AppText.kanit(fontSize: 11, color: Colors.grey.shade500),
             ),
             const SizedBox(height: 10),
@@ -121,60 +108,50 @@ class _GradeSubmitScreenState extends State<GradeSubmitScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'ส่งแล้ว $submittedCount/${rows.length} คน',
-                        style: AppText.kanit(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: kDark,
-                        ),
+                        'ส่งแล้ว $_submittedCount/$_totalCount',
+                        style: AppText.kanit(fontSize: 12, fontWeight: FontWeight.w600, color: kDark),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
                   LinearProgressIndicator(
-                    value: submittedCount / totalCount,
+                    value: _totalCount == 0 ? 0 : _submittedCount / _totalCount,
                     backgroundColor: Colors.grey.shade200,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Colors.green,
-                    ),
+                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 14),
-            for (final row in rows)
+            for (final row in _rows)
               TeacherGradeRow(
                 row: row,
-                onMidtermChanged: (v) => setState(() => row.midterm = v),
-                onFinalChanged: (v) => setState(() => row.finalExam = v),
-                onCourseworkChanged: (v) => setState(() => row.coursework = v),
+                onMidtermChanged: (v) {
+                  setState(() => row.midterm = v);
+                },
+                onFinalChanged: (v) {
+                  setState(() => row.finalExam = v);
+                },
+                onCourseworkChanged: (v) {
+                  setState(() => row.coursework = v);
+                },
               ),
             const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
                   child: GhostButton(
-                    text: 'บันทึกร่างลง DB',
-                    onPressed: () async {
-                      await db.saveOrSubmitGrades(
-                        subjectCode: 'ENGCE302',
-                        submitFinal: false,
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('บันทึกคะแนนร่างลงฐานข้อมูลแล้ว 💾'),
-                          ),
-                        );
-                      }
-                    },
+                    text: 'บันทึกร่าง',
+                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('บันทึกร่างแล้ว 💾')),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: PrimaryButton(
                     text: 'ส่งเข้าระบบทะเบียน',
-                    onPressed: () => _submitGrades(db),
+                    onPressed: _submitGrades,
                     backgroundColor: kGold,
                     foregroundColor: kDark,
                   ),
@@ -183,11 +160,15 @@ class _GradeSubmitScreenState extends State<GradeSubmitScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'เฉพาะอาจารย์ • คะแนนจะถูกคำนวณรวมและตัดเกรดด้วย PostgreSQL Trigger อัตโนมัติ',
+              'เฉพาะอาจารย์ • ส่งแล้วล็อกการแก้ไข ต้องติดต่อทะเบียนเพื่อปลดล็อก',
               style: AppText.kanit(fontSize: 10, color: Colors.grey.shade400),
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: CustomBottomNav(
+        currentRoute: '/courses',
+        onTap: (route) => Navigator.pushNamed(context, route),
       ),
     );
   }

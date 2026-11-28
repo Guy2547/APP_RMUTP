@@ -141,7 +141,7 @@ flutter build web
 
 ### ปรับหน้า Login ตามดีไซน์ใหม่
 - เปลี่ยนพื้นหลังเป็นสีเทาอ่อน `#F5F3FA` เต็มจอ ไม่มี AppBar
-- โลโก้ RMUTP ใช้รูปภาพจาก `lib/assets/images/rmutp_logo.jpg` (ไฟล์จริงจากโฟลเดอร์ Logo App)
+- โลโก้ RMUTP ใช้รูปภาพจาก `assets/images/rmutp_logo.png` (ไฟล์จริงจากโฟลเดอร์ Logo App)
 - หัวข้อเป็น "Log in" ขนาดใหญ่ + คำอธิบาย "เข้าสู่มหาวิทยาลัยเทคโนโลยีราชมงคลพระนคร RMUTP"
 - ฟอร์มอีเมลและรหัสผ่านเป็นพื้นหลังขาว โค้งมน 16px มีไอคอนจดหมายและกุญแจ
 - ปุ่ม "ลืมรหัสผ่าน?" วางอยู่ขวาบนของฟิลด์รหัสผ่าน (overlay)
@@ -174,6 +174,42 @@ flutter build web
 - `lib/screens/login_screen.dart` — เขียน UI ใหม่ทั้งหมด, ลบรหัสผ่าน grอกล่วงหน้า, ลบบัตรบัญชีทดสอบ
 - `lib/screens/home_screen.dart` — เขียนใหม่เป็นกริดเมนู 3×2 + แจ้งเตือน, ลบ bottom nav
 - `lib/screens/grades_screen.dart`, `course_detail_screen.dart`, `attendance_screen.dart`, `courses_screen.dart`, `grade_submit_screen.dart`, `help_screen.dart`, `news_detail_screen.dart`, `news_screen.dart`, `notif_screen.dart`, `profile_screen.dart`, `timetable_screen.dart`, `requests_screen.dart` — ลบ `CustomBottomNav` ออกทั้งหมด
+
+## 🆕 รอบ work ล่าสุด: รวม UI เต็มชุด + Database-only + Login Guard
+
+### สิ่งที่เพิ่มเข้าไป
+- รวม UI จากโปรเจกต์ `C:\data\My data\dev\APP_RMUTP-feat-ui-screensgit` แบบ 100% เข้าโปรเจกต์นี้ (_merge_ ไม่ได้แทนที่โปรเจกต์) — ปรับปรุงหน้าเดิมและเพิ่มหน้าใหม่ 8 หน้า:
+  `about_screen.dart`, `appearance_screen.dart`, `change_password_screen.dart`, `exam_schedule_screen.dart`, `language_screen.dart`, `privacy_screen.dart`, `settings_screen.dart`, `transcript_screen.dart`
+- **ลบ Device Preview ออกทั้งระบบ**: ลบ import/wrapper ใน `main.dart`, ลบ `device_preview: 1.2.0` ออกจาก `pubspec.yaml` (และ `device_frame` ถูกตัดออกจาก lock ด้วย)
+- **แก้โลโก้ RMUTP**: ใช้ไฟล์จริงจาก `C:\data\My data\dev\Logo App` copy เป็น `assets/images/rmutp_logo.png` และประกาศ `- assets/images/` ใน `pubspec.yaml`
+- **บังคับล็อกอินก่อนเห็นข้อมูล**: `currentUser` เริ่มเป็น `null`, `initialRoute: '/login'` และมี `_protectedRoutes` ใน `onGenerateRoute` — ถ้ายังไม่ล็อกอินแล้วพยายามเข้า `/home`, `/grades`, `/news` ฯลฯ จะถูกส่งกลับหน้า Login
+- **โหลดข้อมูลจากฐานข้อมูลเท่านั้น**: `AppDatabaseProvider` ไม่ import `mock_data.dart` อีกต่อไป, รายการเริ่มต้นเป็น `[]` และดึงผ่าน `DatabaseService` หลังล็อกอิน
+  - `courses_screen.dart` ใช้ `teacherTimetable` / `studentTimetable`
+  - `grade_submit_screen.dart` ใช้ `teacherGradeRows`, `submittedGradeCount`
+  - `news_screen.dart` ใช้ `newsList`, `requests_screen.dart` ใช้ `allRequests`
+  - `home_screen.dart` แสดงชื่อ/รหัสนักศึกษาจาก `currentUser` แทนค่าที่ฝังไว้
+- **เพิ่ม/อัปเดตเทส**: `test/smoke_test.dart`, `test/integration/app_flow_test.dart`, `test/unit/app_database_provider_auth_test.dart`, `test/unit/login_identifier_test.dart`
+
+### ปัญหาที่พบ และวิธีแก้
+
+| ปัญหาที่เจอ | สาเหตุ | วิธีแก้ |
+|-------------|--------|--------|
+| `flutter test` พังด้วย `ProviderNotFoundException` ตอน build `RMUTPApp` | `onGenerateRoute` เรียก `context.read<AppDatabaseProvider>()` แต่เทส pump `RMUTPApp` โดยไม่มี provider อยู่ด้านบน | ห่อด้วย `MultiProvider(RoleProvider + AppDatabaseProvider)` ใน smoke/integration test |
+| Integration test เดิมกด "เข้าสู่ระบบ" โดยไม่กรอกอะไรแล้วคาดว่าไป `/home` | เทสเขียนไว้ก่อนมี login guard | เปลี่ยนเป็นเทสว่า "ยังไม่ล็อกอินแล้ว `pushNamed('/home')` ต้องถูกกันกลับมา Login" และใช้ session จำลองแทนการยิง network |
+| Compile error เรื่อง `currentUser` เป็น nullable | เปลี่ยนจากค่าเริ่มต้นเป็น session จริงทำให้ทุกการเข้าถึงต้องเช็ค null | ใช้ `currentUser?.`, `isEmpty`, early return ใน provider ทุกจุด |
+| กด "ออกจากระบบ"แล้วข้อมูลยังอยู่ | `settings_screen` แค่ navigate ไป `/login` ไม่ได้ล้าง `currentUser` จึงย้อนกลับเข้าเส้นทางที่ป้องกันได้ | เพิ่ม `logout()` ใน provider ล้าง session + ข้อมูลทั้งหมด และเรียกก่อน navigate |
+| ล็อกอินด้วยรหัสนักศึกษาแล้วไม่ผ่าน | UI แสดงช่อง "รหัสนักศึกษา" แต่ `sp_authenticate_user` เปรียบเทียบกับ `p_email` เท่านั้น (ดู SQL จริง) | เพิ่ม `normalizeLoginIdentifier()` แปลง `650602001` → `s650602001@rmutp.ac.th` ตาม `DATABASE_GUIDE.md`; ถ้ากรอกอีเมลมาครบอยู่แล้วปล่อยผ่าน |
+| ยังมีข้อมูลตัวอย่างค้างอยู่ | provider มี `attendanceRecords` 12 คนแบบ hardcode และหน้าตัดเกรดโชว์ "28/40" คงที่ | เปลี่ยนเป็น `[]` และคำนวณจาก `db.teacherGradeRows` / `db.submittedGradeCount` |
+| `flutter analyze` เจอ 9 info (`use_build_context_synchronously`, `unnecessary_to_list_in_spreads`, `withOpacity` deprecated, `prefer_final_fields`) | โค้ดเขียนด้วย API/รูปแบบเก่า | ใช้ `context.mounted`, ลบ `.toList()` ใน spread, เปลี่ยน `withOpacity` → `withValues(alpha:)`, ใช้ getter แทน field คงที่ |
+| มีไฟล์โลโก้ซ้ำใน `lib/assets/images/` | คopi UI ต้นฉบับเข้ามาแล้วไม่ได้ใช้ | ลบออก เหลือเฉพาะ `assets/images/rmutp_logo.png` ที่ประกาศใน pubspec |
+
+### ผลการตรวจสอบ
+- `flutter test` → **44 tests passed**
+- `flutter analyze` → **No issues found**
+- `google_fonts` ยังล็อกอยู่ที่ **8.2.1** (ห้าม upgrade เป็น 9.x เพราะจะเกิด error `TextTheme`)
+
+### หมายเหตุ
+บางหน้ายังใช้ array ข้อมูลคงที่ที่มากับ UI ต้นฉบับ (เช่น `attendance_screen.dart`, `exam_schedule_screen.dart`, `grades_screen.dart`, `timetable_screen.dart`, `transcript_screen.dart`, `notif_screen.dart`) ยังไม่ได้แปลงเป็นข้อมูลจากฐานข้อมูลทั้งหมด
 
 ## เอกสารอ้างอิง
 

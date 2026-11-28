@@ -1,8 +1,125 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_database_provider.dart';
-import '../providers/role_provider.dart';
-import '../widgets/app_theme.dart';
+
+const Color _kPrimary = Color(0xFF4A148C);
+const Color _kBackground = Color(0xFFF7F6FA);
+const Color _kInk = Color(0xFF21172F);
+const Color _kMuted = Color(0xFF756B80);
+const Color _kFieldBorder = Color(0xFFDED6E8);
+const Color _kDivider = Color(0xFFE1DAE8);
+const Color _kOutlineButtonBorder = Color(0xFFD6C6E5);
+const Color _kButtonBorder = Color(0xFF2C2C2C);
+const Color _kOnPrimary = Color(0xFFF5F5F5);
+
+const String _kLogoAsset = 'assets/images/rmutp_logo.png';
+
+/// หน้าloginแสดงช่อง "รหัสนักศึกษา" แต่ฐานข้อมูลยืนยันตัวตนด้วยอีเมล
+/// (`sp_authenticate_user(p_email, ...)`) — แปลงรหัสนักศึกษาเป็นอีเมล
+/// มหาวิทยาลัยตามรูปแบบที่บันทึกไว้ใน DATABASE_GUIDE.md
+String normalizeLoginIdentifier(String raw) {
+  final value = raw.trim();
+  if (value.isEmpty || value.contains('@')) return value;
+  if (RegExp(r'^\d+$').hasMatch(value)) return 's$value@rmutp.ac.th';
+  return value;
+}
+
+// Design frame: 402 x 874. Header is 258 tall, of which 52 is the status bar.
+const double _kHeaderBelowStatusBar = 206;
+const double _kLogoSize = 190;
+const double _kLogoTop = 2;
+const double _kCaptionTop = 176;
+
+enum _LineIconKind { studentId, lock, eye, eyeOff }
+
+class _LineIcon extends StatelessWidget {
+  const _LineIcon(this.kind);
+
+  final _LineIconKind kind;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+        size: const Size(20, 20),
+        painter: _LineIconPainter(kind),
+      );
+}
+
+class _LineIconPainter extends CustomPainter {
+  const _LineIconPainter(this.kind);
+
+  final _LineIconKind kind;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 20, size.height / 20);
+    final paint = Paint()
+      ..color = _kMuted
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.41667
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    switch (kind) {
+      case _LineIconKind.studentId:
+        canvas.drawRRect(
+          RRect.fromLTRBR(2.5, 3.33333, 17.5, 16.6667, const Radius.circular(2.5)),
+          paint,
+        );
+        canvas.drawCircle(const Offset(7.5, 8.33333), 1.66667, paint);
+        canvas.drawPath(
+          Path()
+            ..moveTo(5, 13.3333)
+            ..cubicTo(5, 10, 10, 10, 10, 13.3333)
+            ..moveTo(12.5, 7.5)
+            ..lineTo(15, 7.5)
+            ..moveTo(12.5, 10.8333)
+            ..lineTo(15, 10.8333),
+          paint,
+        );
+      case _LineIconKind.lock:
+        canvas.drawRRect(
+          RRect.fromLTRBR(4.16667, 8.33331, 15.8333, 17.5, const Radius.circular(2.5)),
+          paint,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(6.66667, 8.33332)
+            ..lineTo(6.66667, 5)
+            ..arcTo(
+              Rect.fromCircle(center: const Offset(10, 5), radius: 3.33333),
+              3.14159265,
+              3.14159265,
+              false,
+            )
+            ..lineTo(13.3333, 8.33332)
+            ..moveTo(10, 11.6667)
+            ..lineTo(10, 14.1667),
+          paint,
+        );
+      case _LineIconKind.eye:
+      case _LineIconKind.eyeOff:
+        canvas.drawPath(
+          Path()
+            ..moveTo(1.66667, 10)
+            ..cubicTo(1.66667, 10, 5, 4.16666, 10, 4.16666)
+            ..cubicTo(15, 4.16666, 18.3333, 10, 18.3333, 10)
+            ..cubicTo(18.3333, 10, 15, 15.8333, 10, 15.8333)
+            ..cubicTo(5, 15.8333, 1.66667, 10, 1.66667, 10)
+            ..close(),
+          paint,
+        );
+        canvas.drawCircle(const Offset(10, 10), 2.5, paint);
+        if (kind == _LineIconKind.eyeOff) {
+          canvas.drawLine(const Offset(3.5, 16.5), const Offset(16.5, 3.5), paint);
+        }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_LineIconPainter old) => old.kind != kind;
+}
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,293 +129,299 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
   bool _obscure = true;
 
-  Future<void> _handleSignIn() async {
-    final email = _emailCtrl.text.trim();
-    final pass = _passCtrl.text;
-
-    if (email.isEmpty || pass.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกอีเมลมหาวิทยาลัยและรหัสผ่าน')),
-      );
-      return;
-    }
-
-    final dbProvider = context.read<AppDatabaseProvider>();
-    final session = await dbProvider.loginWithCredentials(email, pass);
-
-    if (!mounted) return;
-
-    if (session == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.red.shade700,
-          content: Text(dbProvider.lastError ?? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'),
-        ),
-      );
-      return;
-    }
-
-    context.read<RoleProvider>().setRole(
-      session.isTeacher ? AppRole.teacher : AppRole.student,
-    );
-    Navigator.pushNamed(context, '/home');
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
   }
+
+  Future<void> _handleLogin(BuildContext context) async {
+    final db = context.read<AppDatabaseProvider>();
+    final email = normalizeLoginIdentifier(_usernameCtrl.text);
+    final password = _passwordCtrl.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณากรอกรหัสนักศึกษาและรหัสผ่าน')),
+      );
+      return;
+    }
+
+    final session = await db.loginWithCredentials(email, password);
+    if (!context.mounted) return;
+
+    if (session != null) {
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(db.lastError ?? 'ล็อกอินไม่สำเร็จ')),
+      );
+    }
+  }
+
+  TextStyle _thai(double size, FontWeight weight, Color color, double lineHeight) =>
+      GoogleFonts.notoSansThai(
+        fontSize: size,
+        fontWeight: weight,
+        color: color,
+        height: lineHeight / size,
+      );
 
   @override
   Widget build(BuildContext context) {
-    final dbProvider = context.watch<AppDatabaseProvider>();
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F3FA),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: _kBackground,
+        body: SingleChildScrollView(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // โลโก้ RMUTP + หัวข้อ (อยู่กลางด้านบน)
+              _buildHeader(context),
               Center(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 20),
-                    Image.asset(
-                      'lib/assets/images/rmutp_logo.jpg',
-                      height: 56,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 56,
-                        width: 56,
-                        decoration: BoxDecoration(
-                          color: kDark,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'RMUTP',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 26,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                      ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 450),
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 35),
+                      child: _buildForm(context),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'STUDENT PORTAL',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Log in',
-                      style: TextStyle(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w800,
-                        color: kDark,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'เข้าสู่มหาวิทยาลัยเทคโนโลยีราชมงคลพระนคร RMUTP',
-                      style: AppText.kanit(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                  ],
-                ),
-              ),
-
-              // อีเมล
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'อีเมล',
-                  style: AppText.kanit(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _emailCtrl,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 's650602xxx@rmutp.ac.th',
-                  prefixIcon: const Icon(Icons.email_outlined, color: kMid, size: 22),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: kDark, width: 2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // รหัสผ่าน
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'รหัสผ่าน',
-                  style: AppText.kanit(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Stack(
-                children: [
-                  TextField(
-                    controller: _passCtrl,
-                    obscureText: _obscure,
-                    decoration: InputDecoration(
-                      hintText: 'กรุณากรอกรหัสผ่าน',
-                      prefixIcon: const Icon(Icons.lock_outline, color: kMid, size: 22),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                          color: kMid,
-                          size: 22,
-                        ),
-                        onPressed: () => setState(() => _obscure = !_obscure),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(color: kDark, width: 2),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 20,
-                    top: 0,
-                    bottom: 0,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
-                        child: Text(
-                          'ลืมรหัสผ่าน?',
-                          style: AppText.kanit(
-                            fontSize: 12,
-                            color: kMid,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-
-              // ปุ่มเข้าสู่ระบบ
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: dbProvider.isLoading ? null : _handleSignIn,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kDark,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: dbProvider.isLoading
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          'เข้าสู่ระบบ',
-                          style: AppText.kanit(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // ลืมรหัสผ่าน + เข้าสู่บัญชี RMUTP (แถวเดียว)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'ลืมรหัสผ่าน? ',
-                    style: AppText.kanit(
-                      fontSize: 13,
-                      color: Colors.grey.shade700,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
-                    child: Text(
-                      'เข้าสู่บัญชี RMUTP',
-                      style: AppText.kanit(
-                        fontSize: 13,
-                        color: kDark,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-
-              // ข้อความล่าง
-              Text(
-                'ไม่มีบัญชีผู้ใช้งานในระบบของมหาวิทยาลัย',
-                style: AppText.kanit(
-                  fontSize: 11,
-                  color: Colors.grey.shade500,
-                ),
-              ),
-              const SizedBox(height: 20),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top;
+    return Container(
+      color: Colors.white,
+      height: topInset + _kHeaderBelowStatusBar,
+      width: double.infinity,
+      child: Stack(
+        children: [
+          Positioned(
+            top: topInset + _kLogoTop,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Image.asset(
+                _kLogoAsset,
+                width: _kLogoSize,
+                height: _kLogoSize,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+          Positioned(
+            top: topInset + _kCaptionTop,
+            left: 0,
+            right: 0,
+            child: Text(
+              'STUDENT PORTAL',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: _kMuted,
+                height: 13.5 / 9,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildForm(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Log in',
+          style: GoogleFonts.inter(
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+            height: 42 / 28,
+            color: _kInk,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          'เข้าสู่ระบบบริการนักศึกษา RMUTP',
+          style: _thai(13, FontWeight.w400, _kMuted, 20),
+        ),
+        const SizedBox(height: 18),
+        _label('ชื่อผู้ใช้'),
+        const SizedBox(height: 7),
+        _field(
+          icon: const _LineIcon(_LineIconKind.studentId),
+          hint: 'รหัสนักศึกษา',
+          controller: _usernameCtrl,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.username],
+        ),
+        const SizedBox(height: 21),
+        _label('รหัสผ่าน'),
+        const SizedBox(height: 7),
+        _field(
+          icon: const _LineIcon(_LineIconKind.lock),
+          hint: 'รหัสบัตรประชาชน',
+          controller: _passwordCtrl,
+          obscure: _obscure,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.password],
+          suffix: IconButton(
+            onPressed: () => setState(() => _obscure = !_obscure),
+            tooltip: _obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 44, height: 44),
+            icon: _LineIcon(
+              _obscure ? _LineIconKind.eye : _LineIconKind.eyeOff,
+            ),
+          ),
+        ),
+        const SizedBox(height: 15),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.black,
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 18),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(
+              'ลืมรหัสผ่าน?',
+              style: _thai(12, FontWeight.w500, Colors.black, 18),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: () => _handleLogin(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kPrimary,
+              foregroundColor: _kOnPrimary,
+              elevation: 0,
+              padding: const EdgeInsets.all(8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: _kButtonBorder),
+              ),
+            ),
+            child: Text(
+              'เข้าสู่ระบบ',
+              style: _thai(15, FontWeight.w600, _kOnPrimary, 22),
+            ),
+          ),
+        ),
+        const SizedBox(height: 17),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: Container(height: 1, color: _kDivider)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 23),
+              child: Text('หรือ', style: _thai(11, FontWeight.w400, _kMuted, 17)),
+            ),
+            Expanded(child: Container(height: 1, color: _kDivider)),
+          ],
+        ),
+        const SizedBox(height: 19),
+        SizedBox(
+          height: 52,
+          child: OutlinedButton(
+            onPressed: () => _handleLogin(context),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: _kPrimary,
+              side: const BorderSide(color: _kOutlineButtonBorder),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: Text(
+              'เข้าสู่ระบบด้วย RMUTP',
+              style: _thai(14, FontWeight.w600, _kPrimary, 21),
+            ),
+          ),
+        ),
+        const SizedBox(height: 42),
+        Center(
+          child: Text(
+            'มหาวิทยาลัยเทคโนโลยีราชมงคลพระนคร',
+            style: _thai(10, FontWeight.w400, _kMuted, 15),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _label(String text) => SizedBox(
+        height: 20,
+        child: Text(text, style: _thai(13, FontWeight.w500, _kInk, 19.5)),
+      );
+
+  Widget _field({
+    required Widget icon,
+    required String hint,
+    required TextEditingController controller,
+    bool obscure = false,
+    Widget? suffix,
+    TextInputType? keyboardType,
+    TextInputAction? textInputAction,
+    Iterable<String>? autofillHints,
+  }) {
+    final style = _thai(14, FontWeight.w400, _kInk, 21);
+    return Container(
+      height: 54,
+      padding: EdgeInsets.only(left: 15, right: suffix != null ? 5 : 15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kFieldBorder),
+      ),
+      child: Row(
+        children: [
+          icon,
+          const SizedBox(width: 6),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              obscureText: obscure,
+              keyboardType: keyboardType,
+              textInputAction: textInputAction,
+              autofillHints: autofillHints,
+              style: style,
+              cursorColor: _kPrimary,
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: style.copyWith(color: _kMuted),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          if (suffix != null) suffix,
+        ],
       ),
     );
   }

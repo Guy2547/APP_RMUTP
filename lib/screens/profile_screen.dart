@@ -1,9 +1,37 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/app_database_provider.dart';
-import '../providers/role_provider.dart';
-import '../services/database_service.dart';
-import '../widgets/app_theme.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+const Color _kBg = Color(0xFFF7F6FA);
+const Color _kPrimary = Color(0xFF4A148C);
+const Color _kInk = Color(0xFF21172F);
+const Color _kMuted = Color(0xFF756B80);
+const Color _kOnPrimaryMuted = Color(0xFFE5D6F8);
+const Color _kAvatarBg = Color(0xFFF2ECFA);
+const Color _kBadgeBg = Color(0xFFF1ECF8);
+const Color _kDivider = Color(0xFFEEE9F3);
+
+TextStyle _thai(double size, FontWeight weight, Color color) =>
+    GoogleFonts.notoSansThai(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      height: 1.45,
+    );
+
+TextStyle _inter(
+  double size,
+  FontWeight weight,
+  Color color, {
+  double? letterSpacing,
+}) =>
+    GoogleFonts.inter(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      height: 1.45,
+      letterSpacing: letterSpacing,
+    );
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -13,422 +41,519 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  int _selectedTab = 0;
-
-  final List<String> _tabs = ['ข้อมูลส่วนตัว', 'เกรดสะสม'];
+  bool _highBrightness = true;
 
   @override
   Widget build(BuildContext context) {
-    final isTeacher = context.watch<RoleProvider>().isTeacher;
-    final db = context.watch<AppDatabaseProvider>();
-    final user = db.currentUser;
-
     return Scaffold(
-      backgroundColor: kBg,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('โปรไฟล์',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kDark),
-          onPressed: () => Navigator.pop(context),
+      backgroundColor: _kBg,
+      appBar: _buildHeader(context, 'บัตรนักศึกษา'),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            children: [
+              const _StudentIdCard(),
+              const SizedBox(height: 20),
+              const _CampusAccessCard(),
+              const SizedBox(height: 16),
+              _BrightnessControlCard(
+                value: _highBrightness,
+                onChanged: (v) => setState(() => _highBrightness = v),
+              ),
+            ],
+          ),
         ),
       ),
-      body: Column(
-        children: [
-          // Profile header (purple card)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [kDark, kMain],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(30),
-                bottomRight: Radius.circular(30),
-              ),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(44),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      width: 2,
-                    ),
-                  ),
-                  child: const Icon(Icons.person, color: Colors.white, size: 40),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  user.displayName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isTeacher
-                      ? '${user.subtitleInfo} • อาจารย์ประจำภาควิชา'
-                      : '${user.subtitleInfo} • ปี ${_yearLevel(user.studentId)}',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _profileStat(
-                        label: 'รหัสนักศึกษา',
-                        value: user.studentId ?? 'T-1024',
-                      ),
-                    ),
-                    Expanded(
-                      child: _profileStat(
-                        label: 'GPA สะสม',
-                        value: user.gpax.toStringAsFixed(2),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 40,
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/grades'),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: kGold),
-                      foregroundColor: kGold,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      'ดูรายละเอียดเกรด',
-                      style: AppText.kanit(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Tabs
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: _tabs.asMap().entries.map((e) {
-                final active = _selectedTab == e.key;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedTab = e.key),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: active ? kDark : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: active ? kDark : kBorderLight,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          e.value,
-                          style: AppText.kanit(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: active ? Colors.white : kMid,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Tab content
-          Expanded(
-            child: _selectedTab == 0
-                ? _buildInfoTab(user, isTeacher, db)
-                : _buildGradesTab(db),
-          ),
-        ],
-      ),
     );
-  }
-
-  Widget _profileStat({
-    required String label,
-    required String value,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.8),
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoTab(AuthenticatedUserSession user,
-      bool isTeacher, AppDatabaseProvider db) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'ข้อมูลส่วนตัว',
-            style: AppText.kanit(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: kDark,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _infoRow('ชื่อ - สกุล', user.displayName),
-          _infoRow('รหัสนักศึกษา', user.studentId ?? 'T-1024'),
-          _infoRow('อีเมลมหาวิทยาลัย', db.currentUser.email),
-          _infoRow('คณะ', 'คณะวิศวกรรมศาสตร์'),
-          _infoRow('สาขา', 'วิศวกรรมคอมพิวเตอร์'),
-          _infoRow('ปีการศึกษา', _yearLevel(user.studentId)),
-          _infoRow('เกรดเฉลี่ยสะสม', user.gpax.toStringAsFixed(2)),
-          _infoRow('หน่วยกิตสะสม', '${user.earnedCredits} / ${user.totalCreditsRequired}'),
-          const SizedBox(height: 20),
-          AppCard(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'การตั้งค่า',
-                  style: AppText.kanit(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: kDark,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _settingRow('ภาษา', 'ไทย 🇹🇭', () {}),
-                _settingRow('การแจ้งเตือน', 'เปิดใช้งาน', () {
-                  Navigator.pushNamed(context, '/notif');
-                }),
-                _settingRow('ความปลอดภัย', 'เปลี่ยนรหัสผ่าน', () {
-                  Navigator.pushNamed(context, '/forgot-password');
-                }),
-                _settingRow('ออกจากระบบ', '', () async {
-                  await DatabaseService.clearSession();
-                  if (mounted) {
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/login',
-                      (route) => false,
-                    );
-                  }
-                }, isDestructive: true),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 150,
-            child: Text(
-              label,
-              style: AppText.kanit(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppText.kanit(
-                fontSize: 12,
-                color: kDark,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _settingRow(String title, String subtitle, VoidCallback onTap,
-      {bool isDestructive = false}) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        title,
-        style: AppText.kanit(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: isDestructive ? Colors.red.shade700 : kDark,
-        ),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (subtitle.isNotEmpty)
-            Text(
-              subtitle,
-              style: AppText.kanit(
-                fontSize: 11,
-                color: Colors.grey.shade500,
-              ),
-            ),
-          const SizedBox(width: 8),
-          const Icon(
-            Icons.chevron_right,
-            color: kMid,
-            size: 20,
-          ),
-        ],
-      ),
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildGradesTab(AppDatabaseProvider db) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'ประวัติเกรดทั้งหมด',
-            style: AppText.kanit(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: kDark,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ...db.studentGrades.map((g) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              child: AppCard(
-                color: Colors.white,
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: _gradeColor(g.score).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          g.letter.split(' ').first,
-                          style: TextStyle(
-                            color: _gradeColor(g.score),
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${g.subjectCode} ${g.subjectName}',
-                            style: AppText.kanit(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: kDark,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'คะแนน ${g.score.toStringAsFixed(1)} / 4.00',
-                            style: AppText.kanit(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Color _gradeColor(double score) {
-    if (score >= 3.5) return Colors.green.shade600;
-    if (score >= 3.0) return Colors.green.shade500;
-    if (score >= 2.5) return Colors.amber.shade600;
-    if (score >= 2.0) return Colors.orange.shade600;
-    return Colors.red.shade600;
-  }
-
-  String _yearLevel(String? studentId) {
-    if (studentId == null || studentId.isEmpty) return '-';
-    final year = int.tryParse(studentId.substring(1, 3)) ?? 25;
-    final currentYear = 2569; // พ.ศ. ปัจจุบัน
-    final entered = 2500 + year;
-    final level = currentYear - entered + 1;
-    return 'ปี $level';
   }
 }
 
+PreferredSizeWidget _buildHeader(BuildContext context, String title) {
+  return AppBar(
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.white,
+    elevation: 0,
+    scrolledUnderElevation: 0,
+    toolbarHeight: 50,
+    centerTitle: true,
+    systemOverlayStyle: SystemUiOverlayStyle.dark,
+    leadingWidth: 64,
+    leading: Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16),
+        child: InkWell(
+          onTap: () => Navigator.pop(context),
+          borderRadius: BorderRadius.circular(20),
+          child: const Padding(
+            padding: EdgeInsets.all(8),
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CustomPaint(painter: _BackChevronPainter()),
+            ),
+          ),
+        ),
+      ),
+    ),
+    title: Text(title, style: _thai(21, FontWeight.w600, _kInk)),
+  );
+}
 
+class _BackChevronPainter extends CustomPainter {
+  const _BackChevronPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 28, size.height / 28);
+    final paint = Paint()
+      ..color = _kPrimary
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path()
+      ..moveTo(17, 6)
+      ..lineTo(9, 14)
+      ..lineTo(17, 22);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _StudentIdCard extends StatelessWidget {
+  const _StudentIdCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: _kPrimary.withValues(alpha: 0.09),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                height: 98,
+                color: _kPrimary,
+                padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'RMUTP',
+                          style: _inter(29, FontWeight.w700, Colors.white),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          'มหาวิทยาลัยเทคโนโลยีราชมงคลพระนคร',
+                          style: _thai(10, FontWeight.w400, _kOnPrimaryMuted),
+                        ),
+                      ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        'STUDENT ID',
+                        style: _inter(
+                          10,
+                          FontWeight.w600,
+                          _kOnPrimaryMuted,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Container(
+                          height: 27,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          decoration: BoxDecoration(
+                            color: _kBadgeBg,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.check_rounded,
+                                size: 14,
+                                color: _kPrimary,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'ใช้งานได้',
+                                style: _thai(11, FontWeight.w500, _kPrimary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+                    Text(
+                      'Theerachut',
+                      style: _inter(22, FontWeight.w600, _kInk),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '65012345678-9',
+                      style: _inter(15, FontWeight.w500, _kPrimary),
+                    ),
+                    const SizedBox(height: 15),
+                    const Divider(height: 1, thickness: 1, color: _kDivider),
+                    const SizedBox(height: 15),
+                    Text(
+                      'FACULTY',
+                      style: _inter(
+                        9,
+                        FontWeight.w600,
+                        _kMuted,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Faculty of Engineering',
+                      style: _inter(14, FontWeight.w500, _kInk),
+                    ),
+                    const SizedBox(height: 11),
+                    Text(
+                      'MAJOR',
+                      style: _inter(
+                        9,
+                        FontWeight.w600,
+                        _kMuted,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Computer Engineering',
+                      style: _inter(14, FontWeight.w500, _kInk),
+                    ),
+                    const SizedBox(height: 11),
+                    const Divider(height: 1, thickness: 1, color: _kDivider),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'VALID UNTIL',
+                          style: _inter(
+                            9,
+                            FontWeight.w600,
+                            _kMuted,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        Text(
+                          '31 MAY 2027',
+                          style: _inter(11, FontWeight.w600, _kPrimary),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            left: 24,
+            top: 78,
+            child: Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                color: _kAvatarBg,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 5),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.person_rounded,
+                  size: 46,
+                  color: Color(0xFFB5A4CB),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CampusAccessCard extends StatelessWidget {
+  const _CampusAccessCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(19, 14, 19, 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _kDivider, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'สแกนเพื่อเข้าใช้งาน',
+            style: _thai(16, FontWeight.w600, _kInk),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'อาคารเรียน · ห้องสมุด · บริการในมหาวิทยาลัย',
+            style: _thai(10.5, FontWeight.w400, _kMuted),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  children: [
+                    const SizedBox(
+                      height: 60,
+                      width: double.infinity,
+                      child: CustomPaint(painter: _BarcodePainter()),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '65012345678-9',
+                      style: _inter(12, FontWeight.w500, _kInk),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'BARCODE',
+                      style: _inter(
+                        9,
+                        FontWeight.w500,
+                        _kMuted,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 91,
+                margin: const EdgeInsets.symmetric(horizontal: 14),
+                color: _kDivider,
+              ),
+              Column(
+                children: [
+                  const SizedBox(
+                    width: 108,
+                    height: 108,
+                    child: CustomPaint(painter: _QrCodePainter()),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'QR CODE',
+                    style: _inter(
+                      9,
+                      FontWeight.w500,
+                      _kMuted,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrightnessControlCard extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _BrightnessControlCard({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: Container(
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 17),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.wb_sunny_outlined,
+              size: 22,
+              color: _kPrimary,
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'เพิ่มความสว่าง',
+                    style: _thai(14, FontWeight.w500, _kInk),
+                  ),
+                  Text(
+                    'ช่วยให้เครื่องอ่านสแกนได้ง่ายขึ้น',
+                    style: _thai(10, FontWeight.w400, _kMuted),
+                  ),
+                ],
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 48,
+              height: 28,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: value ? _kPrimary : const Color(0xFFD8D1E2),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: AnimatedAlign(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                alignment:
+                    value ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BarcodePainter extends CustomPainter {
+  const _BarcodePainter();
+
+  // Code 128-style bar/space widths for "65012345678-9"
+  static const List<int> _pattern = [
+    2, 1, 1, 4, 1, 2, 1, 2, 2, 1, 3, 1, 1, 1, 2, 2,
+    3, 1, 2, 1, 1, 3, 1, 2, 2, 2, 1, 1, 2, 1, 3, 1,
+    1, 2, 1, 1, 3, 2, 2, 1, 1, 2, 2, 1, 1, 3, 1, 1,
+    2, 2, 1, 2, 3, 1, 1, 1, 2, 1, 2, 2, 2, 1, 1, 3,
+    1, 2, 1, 2, 2, 1, 3, 1, 1, 2, 2, 3, 1, 1, 1, 2,
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0xFF15101D);
+    final totalUnits = _pattern.fold<int>(0, (sum, w) => sum + w);
+    final unitWidth = size.width / totalUnits;
+    double x = 0;
+    for (int i = 0; i < _pattern.length; i++) {
+      final w = _pattern[i] * unitWidth;
+      if (i.isEven) {
+        canvas.drawRect(Rect.fromLTWH(x, 0, w, size.height), paint);
+      }
+      x += w;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _QrCodePainter extends CustomPainter {
+  const _QrCodePainter();
+
+  static const int _gridSize = 21;
+
+  static const List<String> _matrix = [
+    '111111101011001111111',
+    '100000100100101000001',
+    '101110101110001011101',
+    '101110100010101011101',
+    '101110101001001011101',
+    '100000100110101000001',
+    '111111101010101111111',
+    '000000001101000000000',
+    '101101110010110110101',
+    '010010001101001001010',
+    '110111101011101101101',
+    '001000010100010010010',
+    '101110111010111011011',
+    '000000001011001001001',
+    '111111100100101011100',
+    '100000101110000100111',
+    '101110100010111011010',
+    '101110101101001000101',
+    '101110100110101110011',
+    '100000101001000011100',
+    '111111101100111010111',
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = const Color(0xFF15101D);
+    final cell = size.width / _gridSize;
+    for (int r = 0; r < _gridSize; r++) {
+      final row = _matrix[r];
+      for (int c = 0; c < _gridSize; c++) {
+        if (row[c] == '1') {
+          canvas.drawRect(
+            Rect.fromLTWH(c * cell, r * cell, cell + 0.25, cell + 0.25),
+            paint,
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}

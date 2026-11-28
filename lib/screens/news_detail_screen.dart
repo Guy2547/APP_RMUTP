@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/app_theme.dart';
-import '../widgets/custom_bottom_nav.dart' show bottomPadding;
+import '../widgets/custom_bottom_nav.dart';
 
 class NewsDetailScreen extends StatelessWidget {
   const NewsDetailScreen({super.key});
@@ -15,7 +15,7 @@ class NewsDetailScreen extends StatelessWidget {
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding(context)),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -98,6 +98,10 @@ class NewsDetailScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: CustomBottomNav(
+        currentRoute: '/news',
+        onTap: (route) => Navigator.pushNamed(context, route),
       ),
     );
   }
